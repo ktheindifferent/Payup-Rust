@@ -110,3 +110,6 @@ pub mod paypal;
 
 /// Square API Implementation
 pub mod square;
+
+/// Extended Stripe API implementations
+pub mod stripe_ext;
