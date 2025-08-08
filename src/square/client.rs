@@ -2,6 +2,7 @@ use reqwest::blocking::Client as HttpClient;
 use reqwest::Client as AsyncHttpClient;
 use serde::{Deserialize, Serialize};
 use crate::error::{PayupError, Result};
+use crate::http_utils::{HttpRequestBuilder, build_url};
 use super::{SquareConfig, SquareAuth, ApiResponse};
 
 pub struct SquareClient {
@@ -9,6 +10,7 @@ pub struct SquareClient {
     pub auth: SquareAuth,
     http_client: HttpClient,
     async_http_client: AsyncHttpClient,
+    request_builder: HttpRequestBuilder,
 }
 
 impl SquareClient {
@@ -24,6 +26,7 @@ impl SquareClient {
             auth,
             http_client: HttpClient::new(),
             async_http_client: AsyncHttpClient::new(),
+            request_builder: HttpRequestBuilder::new("Square"),
         })
     }
 
@@ -31,7 +34,7 @@ impl SquareClient {
     where
         T: for<'de> Deserialize<'de>,
     {
-        let url = format!("{}{}", self.auth.base_url(), endpoint);
+        let url = build_url(self.auth.base_url(), endpoint);
         
         let response = self.http_client
             .get(&url)
@@ -41,36 +44,52 @@ impl SquareClient {
             .send()
             .map_err(PayupError::from)?;
 
+        self.process_square_response(response)
+    }
+
+    fn process_square_response<T>(&self, response: reqwest::blocking::Response) -> Result<T>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
         if !response.status().is_success() {
-            let status = response.status().to_string();
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(PayupError::ApiError {
-                code: status,
-                message: error_text,
-                provider: "Square".to_string(),
-            });
+            return self.handle_error_response(response);
         }
 
         let api_response: ApiResponse<T> = response.json().map_err(PayupError::from)?;
-        
+        self.extract_data_from_response(api_response)
+    }
+
+    fn handle_error_response<T>(&self, response: reqwest::blocking::Response) -> Result<T> {
+        let status = response.status().to_string();
+        let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+        Err(PayupError::ApiError {
+            code: status,
+            message: error_text,
+            provider: "Square".to_string(),
+        })
+    }
+
+    fn extract_data_from_response<T>(&self, api_response: ApiResponse<T>) -> Result<T> {
         if let Some(errors) = api_response.errors {
-            if !errors.is_empty() {
+            if let Some(first_error) = errors.first() {
                 return Err(PayupError::ApiError {
-                    code: errors[0].code.clone(),
-                    message: errors[0].detail.clone().unwrap_or_else(|| errors[0].category.clone()),
+                    code: first_error.code.clone(),
+                    message: first_error.detail.clone()
+                        .unwrap_or_else(|| first_error.category.clone()),
                     provider: "Square".to_string(),
                 });
             }
         }
 
-        api_response.data.ok_or_else(|| PayupError::GenericError("No data in response".to_string()))
+        api_response.data
+            .ok_or_else(|| PayupError::GenericError("No data in response".to_string()))
     }
 
     pub async fn async_get<T>(&self, endpoint: &str) -> Result<T>
     where
         T: for<'de> Deserialize<'de>,
     {
-        let url = format!("{}{}", self.auth.base_url(), endpoint);
+        let url = build_url(self.auth.base_url(), endpoint);
         
         let response = self.async_http_client
             .get(&url)
@@ -81,29 +100,29 @@ impl SquareClient {
             .await
             .map_err(PayupError::from)?;
 
+        self.process_async_square_response(response).await
+    }
+
+    async fn process_async_square_response<T>(&self, response: reqwest::Response) -> Result<T>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
         if !response.status().is_success() {
-            let status = response.status().to_string();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(PayupError::ApiError {
-                code: status,
-                message: error_text,
-                provider: "Square".to_string(),
-            });
+            return self.handle_async_error_response(response).await;
         }
 
         let api_response: ApiResponse<T> = response.json().await.map_err(PayupError::from)?;
-        
-        if let Some(errors) = api_response.errors {
-            if !errors.is_empty() {
-                return Err(PayupError::ApiError {
-                    code: errors[0].code.clone(),
-                    message: errors[0].detail.clone().unwrap_or_else(|| errors[0].category.clone()),
-                    provider: "Square".to_string(),
-                });
-            }
-        }
+        self.extract_data_from_response(api_response)
+    }
 
-        api_response.data.ok_or_else(|| PayupError::GenericError("No data in response".to_string()))
+    async fn handle_async_error_response<T>(&self, response: reqwest::Response) -> Result<T> {
+        let status = response.status().to_string();
+        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        Err(PayupError::ApiError {
+            code: status,
+            message: error_text,
+            provider: "Square".to_string(),
+        })
     }
 
     pub fn post<T, B>(&self, endpoint: &str, body: &B) -> Result<T>
@@ -111,7 +130,7 @@ impl SquareClient {
         T: for<'de> Deserialize<'de>,
         B: Serialize,
     {
-        let url = format!("{}{}", self.auth.base_url(), endpoint);
+        let url = build_url(self.auth.base_url(), endpoint);
         
         let response = self.http_client
             .post(&url)
@@ -122,29 +141,7 @@ impl SquareClient {
             .send()
             .map_err(PayupError::from)?;
 
-        if !response.status().is_success() {
-            let status = response.status().to_string();
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(PayupError::ApiError {
-                code: status,
-                message: error_text,
-                provider: "Square".to_string(),
-            });
-        }
-
-        let api_response: ApiResponse<T> = response.json().map_err(PayupError::from)?;
-        
-        if let Some(errors) = api_response.errors {
-            if !errors.is_empty() {
-                return Err(PayupError::ApiError {
-                    code: errors[0].code.clone(),
-                    message: errors[0].detail.clone().unwrap_or_else(|| errors[0].category.clone()),
-                    provider: "Square".to_string(),
-                });
-            }
-        }
-
-        api_response.data.ok_or_else(|| PayupError::GenericError("No data in response".to_string()))
+        self.process_square_response(response)
     }
 
     pub async fn async_post<T, B>(&self, endpoint: &str, body: &B) -> Result<T>
@@ -152,7 +149,7 @@ impl SquareClient {
         T: for<'de> Deserialize<'de>,
         B: Serialize,
     {
-        let url = format!("{}{}", self.auth.base_url(), endpoint);
+        let url = build_url(self.auth.base_url(), endpoint);
         
         let response = self.async_http_client
             .post(&url)
@@ -164,29 +161,7 @@ impl SquareClient {
             .await
             .map_err(PayupError::from)?;
 
-        if !response.status().is_success() {
-            let status = response.status().to_string();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(PayupError::ApiError {
-                code: status,
-                message: error_text,
-                provider: "Square".to_string(),
-            });
-        }
-
-        let api_response: ApiResponse<T> = response.json().await.map_err(PayupError::from)?;
-        
-        if let Some(errors) = api_response.errors {
-            if !errors.is_empty() {
-                return Err(PayupError::ApiError {
-                    code: errors[0].code.clone(),
-                    message: errors[0].detail.clone().unwrap_or_else(|| errors[0].category.clone()),
-                    provider: "Square".to_string(),
-                });
-            }
-        }
-
-        api_response.data.ok_or_else(|| PayupError::GenericError("No data in response".to_string()))
+        self.process_async_square_response(response).await
     }
 
     pub fn put<T, B>(&self, endpoint: &str, body: &B) -> Result<T>
@@ -194,7 +169,7 @@ impl SquareClient {
         T: for<'de> Deserialize<'de>,
         B: Serialize,
     {
-        let url = format!("{}{}", self.auth.base_url(), endpoint);
+        let url = build_url(self.auth.base_url(), endpoint);
         
         let response = self.http_client
             .put(&url)
@@ -205,33 +180,11 @@ impl SquareClient {
             .send()
             .map_err(PayupError::from)?;
 
-        if !response.status().is_success() {
-            let status = response.status().to_string();
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(PayupError::ApiError {
-                code: status,
-                message: error_text,
-                provider: "Square".to_string(),
-            });
-        }
-
-        let api_response: ApiResponse<T> = response.json().map_err(PayupError::from)?;
-        
-        if let Some(errors) = api_response.errors {
-            if !errors.is_empty() {
-                return Err(PayupError::ApiError {
-                    code: errors[0].code.clone(),
-                    message: errors[0].detail.clone().unwrap_or_else(|| errors[0].category.clone()),
-                    provider: "Square".to_string(),
-                });
-            }
-        }
-
-        api_response.data.ok_or_else(|| PayupError::GenericError("No data in response".to_string()))
+        self.process_square_response(response)
     }
 
     pub fn delete(&self, endpoint: &str) -> Result<bool> {
-        let url = format!("{}{}", self.auth.base_url(), endpoint);
+        let url = build_url(self.auth.base_url(), endpoint);
         
         let response = self.http_client
             .delete(&url)
