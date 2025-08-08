@@ -98,3 +98,15 @@
 
 /// Stripe API Implementation
 pub mod stripe;
+
+/// Error handling module
+pub mod error;
+
+/// Unified payment provider interface
+pub mod payment_provider;
+
+/// PayPal API Implementation
+pub mod paypal;
+
+/// Square API Implementation
+pub mod square;
