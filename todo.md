@@ -31,9 +31,9 @@
 ## Missing Implementations
 
 ### Stripe APIs
-- [ ] Implement Transfer API
-- [ ] Implement Account API
-- [ ] Implement Payment Intent API
+- [x] Implement Transfer API
+- [x] Implement Account API
+- [x] Implement Payment Intent API
 - [ ] Implement Setup Intent API
 - [ ] Implement Application Fee API
 - [ ] Implement Bank Account API
@@ -124,6 +124,12 @@
 - [x] Add comprehensive cryptocurrency payment support (completed in previous PR)
 - [x] Create unified payment provider interface
 - [x] Implement custom error handling system
+- [x] Implement comprehensive Stripe Payment Intent API
+  - Full CRUD operations (create, read, update, cancel, capture)
+  - All payment intent statuses and configuration options
+  - Both sync and async method support
+  - Comprehensive test coverage with 14 test cases
+  - Usage examples in examples/payment_intent_example.rs
 
 ## Notes
 

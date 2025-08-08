@@ -120,3 +120,6 @@ pub mod stripe_ext;
 /// Cryptocurrency payment support
 #[cfg(feature = "crypto")]
 pub mod crypto;
+
+/// Rate limiting and retry logic for API calls
+pub mod rate_limiter;

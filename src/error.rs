@@ -24,6 +24,15 @@ pub enum PayupError {
         retry_after: Option<u64>,
     },
     
+    // Rate limit exceeded (for internal rate limiter)
+    RateLimitExceeded(String),
+    
+    // Timeout error
+    TimeoutError(String),
+    
+    // Server error
+    ServerError(u16),
+    
     // Serialization/Deserialization errors
     SerializationError(serde_json::Error),
     
@@ -73,6 +82,15 @@ impl fmt::Display for PayupError {
             
             PayupError::RateLimitError { retry_after } => 
                 self.format_rate_limit_error(f, *retry_after),
+            
+            PayupError::RateLimitExceeded(msg) => 
+                write!(f, "Rate limit exceeded: {}", msg),
+            
+            PayupError::TimeoutError(msg) => 
+                write!(f, "Timeout error: {}", msg),
+            
+            PayupError::ServerError(status) => 
+                write!(f, "Server error: HTTP {}", status),
             
             PayupError::SerializationError(e) => 
                 write!(f, "Serialization error: {}", e),

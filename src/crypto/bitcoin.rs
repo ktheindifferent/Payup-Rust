@@ -82,7 +82,7 @@ impl BitcoinProvider {
         // Mock implementation
         Ok(LightningInvoice {
             bolt11: format!("lnbc{}n1...", amount_sats),
-            payment_hash: super::Hash::new("payment_hash".to_string()),
+            payment_hash: crate::crypto::Hash::new("payment_hash".to_string()),
             preimage: None,
             amount_sats,
             description: description.to_string(),
@@ -96,7 +96,7 @@ impl BitcoinProvider {
         // Mock implementation
         Ok(LightningInvoice {
             bolt11: bolt11.to_string(),
-            payment_hash: super::Hash::new("decoded_hash".to_string()),
+            payment_hash: crate::crypto::Hash::new("decoded_hash".to_string()),
             preimage: None,
             amount_sats: 100000,
             description: "Decoded invoice".to_string(),
@@ -308,8 +308,8 @@ impl CryptoPaymentProvider for BitcoinProvider {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LightningInvoice {
     pub bolt11: String,
-    pub payment_hash: super::Hash,
-    pub preimage: Option<super::Hash>,
+    pub payment_hash: crate::crypto::Hash,
+    pub preimage: Option<crate::crypto::Hash>,
     pub amount_sats: u64,
     pub description: String,
     pub expires_at: i64,
@@ -440,7 +440,7 @@ mod tests {
     fn test_lightning_invoice() {
         let invoice = LightningInvoice {
             bolt11: "lnbc100n1...".to_string(),
-            payment_hash: super::Hash::new("hash".to_string()),
+            payment_hash: crate::crypto::Hash::new("hash".to_string()),
             preimage: None,
             amount_sats: 100000,
             description: "Test".to_string(),

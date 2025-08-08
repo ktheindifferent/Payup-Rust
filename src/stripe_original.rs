@@ -1,20 +1,5 @@
 pub mod response;
 
-use serde::{Deserialize, Serialize};
-
-// Full V1 API Support Complete
-/// Stores the Stripe API client + secret.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Auth {
-    pub client: String,
-    pub secret: String,
-}
-impl Auth {
-    pub fn new(client: String, secret: String) -> Self {
-        Auth { client, secret }
-    }
-}
-
 // Full V1 API Support Complete
 /// Represents your Stripe balance.
 #[derive(Serialize, Deserialize, Debug, Clone)]
