@@ -102,6 +102,9 @@ pub mod stripe;
 /// Error handling module
 pub mod error;
 
+/// HTTP utilities for reducing code duplication
+pub mod http_utils;
+
 /// Unified payment provider interface
 pub mod payment_provider;
 

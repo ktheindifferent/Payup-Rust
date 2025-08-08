@@ -59,40 +59,78 @@ pub struct PayPalErrorDetail {
 impl fmt::Display for PayupError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PayupError::NetworkError(e) => write!(f, "Network error: {}", e),
-            PayupError::ApiError { code, message, provider } => {
-                write!(f, "{} API error {}: {}", provider, code, message)
-            },
-            PayupError::AuthenticationError(msg) => write!(f, "Authentication error: {}", msg),
-            PayupError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
-            PayupError::RateLimitError { retry_after } => {
-                match retry_after {
-                    Some(seconds) => write!(f, "Rate limit exceeded. Retry after {} seconds", seconds),
-                    None => write!(f, "Rate limit exceeded"),
-                }
-            },
-            PayupError::SerializationError(e) => write!(f, "Serialization error: {}", e),
-            PayupError::GenericError(msg) => write!(f, "Error: {}", msg),
-            PayupError::StripeError { error_type, code, message, param } => {
-                write!(f, "Stripe {} error", error_type)?;
-                if let Some(c) = code {
-                    write!(f, " ({})", c)?;
-                }
-                write!(f, ": {}", message)?;
-                if let Some(p) = param {
-                    write!(f, " [param: {}]", p)?;
-                }
-                Ok(())
-            },
-            PayupError::PayPalError { name, message, debug_id, .. } => {
-                write!(f, "PayPal error {}: {}", name, message)?;
-                if let Some(id) = debug_id {
-                    write!(f, " [debug_id: {}]", id)?;
-                }
-                Ok(())
-            },
-            PayupError::UnsupportedOperation(msg) => write!(f, "Unsupported operation: {}", msg),
+            PayupError::NetworkError(e) => 
+                write!(f, "Network error: {}", e),
+            
+            PayupError::ApiError { code, message, provider } => 
+                write!(f, "{} API error {}: {}", provider, code, message),
+            
+            PayupError::AuthenticationError(msg) => 
+                write!(f, "Authentication error: {}", msg),
+            
+            PayupError::ValidationError(msg) => 
+                write!(f, "Validation error: {}", msg),
+            
+            PayupError::RateLimitError { retry_after } => 
+                self.format_rate_limit_error(f, *retry_after),
+            
+            PayupError::SerializationError(e) => 
+                write!(f, "Serialization error: {}", e),
+            
+            PayupError::GenericError(msg) => 
+                write!(f, "Error: {}", msg),
+            
+            PayupError::StripeError { error_type, code, message, param } => 
+                self.format_stripe_error(f, error_type, code.as_deref(), message, param.as_deref()),
+            
+            PayupError::PayPalError { name, message, debug_id, .. } => 
+                self.format_paypal_error(f, name, message, debug_id.as_deref()),
+            
+            PayupError::UnsupportedOperation(msg) => 
+                write!(f, "Unsupported operation: {}", msg),
         }
+    }
+}
+
+impl PayupError {
+    fn format_rate_limit_error(&self, f: &mut fmt::Formatter<'_>, retry_after: Option<u64>) -> fmt::Result {
+        match retry_after {
+            Some(seconds) => write!(f, "Rate limit exceeded. Retry after {} seconds", seconds),
+            None => write!(f, "Rate limit exceeded"),
+        }
+    }
+
+    fn format_stripe_error(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        error_type: &str,
+        code: Option<&str>,
+        message: &str,
+        param: Option<&str>,
+    ) -> fmt::Result {
+        write!(f, "Stripe {} error", error_type)?;
+        if let Some(c) = code {
+            write!(f, " ({})", c)?;
+        }
+        write!(f, ": {}", message)?;
+        if let Some(p) = param {
+            write!(f, " [param: {}]", p)?;
+        }
+        Ok(())
+    }
+
+    fn format_paypal_error(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        name: &str,
+        message: &str,
+        debug_id: Option<&str>,
+    ) -> fmt::Result {
+        write!(f, "PayPal error {}: {}", name, message)?;
+        if let Some(id) = debug_id {
+            write!(f, " [debug_id: {}]", id)?;
+        }
+        Ok(())
     }
 }
 

@@ -29,15 +29,21 @@ impl WalletAddress {
 
     /// Validate the wallet address format
     pub fn validate(&self) -> Result<bool> {
+        use Cryptocurrency::*;
+        
         match self.cryptocurrency {
-            Cryptocurrency::Bitcoin | Cryptocurrency::BitcoinCash | Cryptocurrency::Litecoin => {
-                validate_bitcoin_address(&self.address, &self.network)
-            }
-            Cryptocurrency::Ethereum | Cryptocurrency::USDC | Cryptocurrency::USDT | Cryptocurrency::DAI => {
-                validate_ethereum_address(&self.address)
-            }
-            Cryptocurrency::Dogecoin => validate_dogecoin_address(&self.address),
-            Cryptocurrency::Solana => validate_solana_address(&self.address),
+            Bitcoin | BitcoinCash | Litecoin => 
+                validate_bitcoin_like_address(&self.address, &self.network),
+            
+            Ethereum | USDC | USDT | DAI => 
+                validate_ethereum_address(&self.address),
+            
+            Dogecoin => 
+                validate_dogecoin_address(&self.address),
+            
+            Solana => 
+                validate_solana_address(&self.address),
+            
             _ => Ok(true), // Default to valid for unsupported cryptocurrencies
         }
     }
@@ -60,20 +66,31 @@ impl WalletAddress {
 
 /// Detect address type based on format
 fn detect_address_type(address: &str, cryptocurrency: &Cryptocurrency) -> AddressType {
+    use Cryptocurrency::*;
+    
     match cryptocurrency {
-        Cryptocurrency::Bitcoin | Cryptocurrency::BitcoinCash | Cryptocurrency::Litecoin => {
-            detect_bitcoin_address_type(address)
-        }
-        Cryptocurrency::Ethereum | Cryptocurrency::USDC | Cryptocurrency::USDT | Cryptocurrency::DAI => {
-            if address.len() == 42 && address.starts_with("0x") {
-                // Could be either EOA or Contract, default to EOA
-                AddressType::EOA
-            } else {
-                AddressType::Unknown
-            }
-        }
+        Bitcoin | BitcoinCash | Litecoin => 
+            detect_bitcoin_address_type(address),
+        
+        Ethereum | USDC | USDT | DAI => 
+            detect_ethereum_address_type(address),
+        
         _ => AddressType::Unknown,
     }
+}
+
+/// Detect Ethereum address type
+fn detect_ethereum_address_type(address: &str) -> AddressType {
+    if is_valid_ethereum_format(address) {
+        AddressType::EOA  // Could be either EOA or Contract, default to EOA
+    } else {
+        AddressType::Unknown
+    }
+}
+
+/// Check if address has valid Ethereum format
+fn is_valid_ethereum_format(address: &str) -> bool {
+    address.len() == 42 && address.starts_with("0x")
 }
 
 /// Detect Bitcoin address type
@@ -82,58 +99,102 @@ fn detect_bitcoin_address_type(address: &str) -> AddressType {
         return AddressType::Unknown;
     }
 
-    match &address[0..1] {
+    let first_char = &address[0..1];
+    
+    match first_char {
         "1" => AddressType::P2PKH,        // Legacy
         "3" => AddressType::P2SH,         // SegWit compatible
-        "b" if address.starts_with("bc1q") => AddressType::P2WPKH,  // Native SegWit
-        "b" if address.starts_with("bc1p") => AddressType::P2TR,     // Taproot
+        "b" => detect_bech32_address_type(address),
         _ => AddressType::Unknown,
     }
 }
 
-/// Validate Bitcoin address format
-fn validate_bitcoin_address(address: &str, network: &Network) -> Result<bool> {
+/// Detect specific Bech32 address type
+fn detect_bech32_address_type(address: &str) -> AddressType {
+    if address.starts_with("bc1q") {
+        AddressType::P2WPKH  // Native SegWit
+    } else if address.starts_with("bc1p") {
+        AddressType::P2TR    // Taproot
+    } else {
+        AddressType::Unknown
+    }
+}
+
+/// Validate Bitcoin-like address format
+fn validate_bitcoin_like_address(address: &str, network: &Network) -> Result<bool> {
     if address.is_empty() {
         return Ok(false);
     }
 
-    // Basic format validation
     let valid = match network {
-        Network::BitcoinMainnet => {
-            // P2PKH (starts with 1)
-            (address.starts_with('1') && address.len() >= 26 && address.len() <= 35) ||
-            // P2SH (starts with 3)
-            (address.starts_with('3') && address.len() >= 26 && address.len() <= 35) ||
-            // Bech32 (starts with bc1)
-            (address.starts_with("bc1") && address.len() >= 42)
-        }
-        Network::BitcoinTestnet => {
-            // Testnet P2PKH (starts with m or n)
-            (address.starts_with('m') || address.starts_with('n')) ||
-            // Testnet P2SH (starts with 2)
-            address.starts_with('2') ||
-            // Testnet Bech32 (starts with tb1)
-            address.starts_with("tb1")
-        }
+        Network::BitcoinMainnet => validate_bitcoin_mainnet_address(address),
+        Network::BitcoinTestnet => validate_bitcoin_testnet_address(address),
         _ => false,
     };
 
     Ok(valid)
 }
 
+/// Validate Bitcoin mainnet address
+fn validate_bitcoin_mainnet_address(address: &str) -> bool {
+    is_valid_p2pkh_mainnet(address) ||
+    is_valid_p2sh_mainnet(address) ||
+    is_valid_bech32_mainnet(address)
+}
+
+/// Validate Bitcoin testnet address
+fn validate_bitcoin_testnet_address(address: &str) -> bool {
+    is_valid_p2pkh_testnet(address) ||
+    is_valid_p2sh_testnet(address) ||
+    is_valid_bech32_testnet(address)
+}
+
+/// Check if address is valid P2PKH mainnet
+fn is_valid_p2pkh_mainnet(address: &str) -> bool {
+    address.starts_with('1') && is_valid_base58_length(address)
+}
+
+/// Check if address is valid P2SH mainnet
+fn is_valid_p2sh_mainnet(address: &str) -> bool {
+    address.starts_with('3') && is_valid_base58_length(address)
+}
+
+/// Check if address is valid Bech32 mainnet
+fn is_valid_bech32_mainnet(address: &str) -> bool {
+    address.starts_with("bc1") && address.len() >= 42
+}
+
+/// Check if address is valid P2PKH testnet
+fn is_valid_p2pkh_testnet(address: &str) -> bool {
+    (address.starts_with('m') || address.starts_with('n')) && is_valid_base58_length(address)
+}
+
+/// Check if address is valid P2SH testnet
+fn is_valid_p2sh_testnet(address: &str) -> bool {
+    address.starts_with('2') && is_valid_base58_length(address)
+}
+
+/// Check if address is valid Bech32 testnet
+fn is_valid_bech32_testnet(address: &str) -> bool {
+    address.starts_with("tb1") && address.len() >= 42
+}
+
+/// Check if address has valid base58 length
+fn is_valid_base58_length(address: &str) -> bool {
+    address.len() >= 26 && address.len() <= 35
+}
+
 /// Validate Ethereum address format
 fn validate_ethereum_address(address: &str) -> Result<bool> {
-    // Check basic format
-    if !address.starts_with("0x") || address.len() != 42 {
+    if !is_valid_ethereum_format(address) {
         return Ok(false);
     }
 
-    // Check if all characters after 0x are hexadecimal
     let hex_part = &address[2..];
-    let valid = hex_part.chars().all(|c| c.is_ascii_hexdigit());
+    let has_valid_hex_chars = hex_part.chars().all(|c| c.is_ascii_hexdigit());
 
     // TODO: Implement EIP-55 checksum validation
-    Ok(valid)
+    Ok(has_valid_hex_chars)
 }
 
 /// Validate Dogecoin address format
@@ -257,28 +318,46 @@ pub fn generate_wallet_address(
 ) -> Result<WalletAddress> {
     // This is a mock implementation
     // In production, use proper cryptographic libraries
+    let hash = generate_address_hash();
+    let address = format_address_for_cryptocurrency(cryptocurrency, network, &hash);
+    
+    Ok(WalletAddress::new(address, cryptocurrency.clone(), network.clone()))
+}
+
+/// Generate hash for address creation
+fn generate_address_hash() -> Vec<u8> {
     let random_bytes: [u8; 32] = rand::random();
     let mut hasher = Sha256::new();
     hasher.update(random_bytes);
-    let hash = hasher.finalize();
-    
-    let address = match cryptocurrency {
-        Cryptocurrency::Bitcoin => {
-            if network.is_testnet() {
-                format!("tb1q{}", hex::encode(&hash[0..20]))
-            } else {
-                format!("bc1q{}", hex::encode(&hash[0..20]))
-            }
-        }
-        Cryptocurrency::Ethereum | Cryptocurrency::USDC | Cryptocurrency::USDT | Cryptocurrency::DAI => {
-            format!("0x{}", hex::encode(&hash[0..20]))
-        }
-        _ => {
-            format!("{}", hex::encode(&hash[0..20]))
-        }
-    };
+    hasher.finalize().to_vec()
+}
 
-    Ok(WalletAddress::new(address, cryptocurrency.clone(), network.clone()))
+/// Format address based on cryptocurrency type
+fn format_address_for_cryptocurrency(
+    cryptocurrency: &Cryptocurrency,
+    network: &Network,
+    hash: &[u8],
+) -> String {
+    use Cryptocurrency::*;
+    
+    let address_bytes = &hash[0..20];
+    
+    match cryptocurrency {
+        Bitcoin => format_bitcoin_address(network, address_bytes),
+        Ethereum | USDC | USDT | DAI => format_ethereum_address(address_bytes),
+        _ => hex::encode(address_bytes),
+    }
+}
+
+/// Format Bitcoin address
+fn format_bitcoin_address(network: &Network, address_bytes: &[u8]) -> String {
+    let prefix = if network.is_testnet() { "tb1q" } else { "bc1q" };
+    format!("{}{}", prefix, hex::encode(address_bytes))
+}
+
+/// Format Ethereum address
+fn format_ethereum_address(address_bytes: &[u8]) -> String {
+    format!("0x{}", hex::encode(address_bytes))
 }
 
 #[cfg(test)]
