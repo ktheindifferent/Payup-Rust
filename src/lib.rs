@@ -98,3 +98,22 @@
 
 /// Stripe API Implementation
 pub mod stripe;
+
+/// Error handling module
+pub mod error;
+
+/// Unified payment provider interface
+pub mod payment_provider;
+
+/// PayPal API Implementation
+pub mod paypal;
+
+/// Square API Implementation
+pub mod square;
+
+/// Extended Stripe API implementations
+pub mod stripe_ext;
+
+/// Cryptocurrency payment support
+#[cfg(feature = "crypto")]
+pub mod crypto;

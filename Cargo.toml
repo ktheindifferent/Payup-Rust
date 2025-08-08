@@ -1,8 +1,8 @@
 [package]
 name = "payup"
-description = "A synchronous + asynchronous payment library for processing payments with rust + stripe."
-version = "0.1.45"
-edition = "2018"
+description = "A synchronous + asynchronous payment library for processing payments with Rust. Supports Stripe, PayPal, and more."
+version = "0.4.0"
+edition = "2021"
 authors = ["Caleb Mitchell Smith-Woolrich <calebsmithwoolrich@gmail.com>"]
 license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/payup"
@@ -11,14 +11,32 @@ readme = "README.md"
 
 [dependencies]
 serde_json = "1.0"
-trust-dns-resolver = "0.20"
-reqwest = { version = "0.11.9", default-features = false, features = ["blocking", "json", "multipart"] }
-serde_derive = "1.0.130"
-tokio = "1.19.2"
+trust-dns-resolver = "0.23"
+reqwest = { version = "0.11", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls"] }
+serde_derive = "1.0"
+tokio = { version = "1.40", features = ["full"] }
+async-trait = "0.1"
+base64 = "0.22"
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+url = "2.5"
+log = "0.4"
+thiserror = "1.0"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+rand = "0.8"
+urlencoding = "2.1"
 
 [dependencies.serde]
 version = "1.0"
 features = ["derive"]
 
 [features]
-default = ["reqwest/default-tls", "trust-dns-resolver/dns-over-native-tls"]
+default = ["stripe", "paypal"]
+stripe = []
+paypal = []
+square = []
+braintree = []
+crypto = []
+all = ["stripe", "paypal", "square", "braintree", "crypto"]
