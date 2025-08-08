@@ -113,3 +113,7 @@ pub mod square;
 
 /// Extended Stripe API implementations
 pub mod stripe_ext;
+
+/// Cryptocurrency payment support
+#[cfg(feature = "crypto")]
+pub mod crypto;
