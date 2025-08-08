@@ -6,7 +6,6 @@ pub mod subscriptions;
 pub mod webhooks;
 
 use serde::{Deserialize, Serialize};
-use crate::error::Result;
 
 pub use auth::PayPalAuth;
 pub use client::PayPalClient;

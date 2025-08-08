@@ -244,7 +244,7 @@ impl Plan {
                     "value": self.description
                 })
             ];
-            client.patch(&endpoint, &operations)?;
+            client.patch::<(), _>(&endpoint, &operations)?;
             Ok(true)
         } else {
             Err(crate::error::PayupError::ValidationError(

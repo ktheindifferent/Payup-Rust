@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 
 /// Coinbase Commerce payment provider
+#[allow(dead_code)]
 pub struct CoinbaseCommerceProvider {
     api_key: String,
     webhook_secret: Option<String>,
@@ -220,11 +221,11 @@ impl CryptoPaymentProvider for CoinbaseCommerceProvider {
         })
     }
 
-    async fn cancel_payment(&self, payment_id: &str) -> Result<bool> {
+    async fn cancel_payment(&self, _payment_id: &str) -> Result<bool> {
         Ok(true)
     }
 
-    async fn list_payments(&self, limit: Option<u32>) -> Result<Vec<CryptoPayment>> {
+    async fn list_payments(&self, _limit: Option<u32>) -> Result<Vec<CryptoPayment>> {
         Ok(Vec::new())
     }
 
@@ -284,12 +285,12 @@ impl CryptoPaymentProvider for CoinbaseCommerceProvider {
         client.get_transaction(tx_hash).await
     }
 
-    async fn get_confirmations(&self, tx_hash: &str, network: &Network) -> Result<u32> {
+    async fn get_confirmations(&self, _tx_hash: &str, _network: &Network) -> Result<u32> {
         Ok(6)
     }
 
-    fn verify_webhook(&self, payload: &[u8], signature: &str) -> Result<bool> {
-        if let Some(secret) = &self.webhook_secret {
+    fn verify_webhook(&self, _payload: &[u8], _signature: &str) -> Result<bool> {
+        if let Some(_secret) = &self.webhook_secret {
             // Mock HMAC verification
             Ok(true)
         } else {
@@ -299,6 +300,7 @@ impl CryptoPaymentProvider for CoinbaseCommerceProvider {
 }
 
 /// BitPay payment provider
+#[allow(dead_code)]
 pub struct BitPayProvider {
     api_token: String,
     test_mode: bool,
@@ -470,11 +472,11 @@ impl CryptoPaymentProvider for BitPayProvider {
         })
     }
 
-    async fn cancel_payment(&self, payment_id: &str) -> Result<bool> {
+    async fn cancel_payment(&self, _payment_id: &str) -> Result<bool> {
         Ok(true)
     }
 
-    async fn list_payments(&self, limit: Option<u32>) -> Result<Vec<CryptoPayment>> {
+    async fn list_payments(&self, _limit: Option<u32>) -> Result<Vec<CryptoPayment>> {
         Ok(Vec::new())
     }
 
@@ -534,17 +536,18 @@ impl CryptoPaymentProvider for BitPayProvider {
         client.get_transaction(tx_hash).await
     }
 
-    async fn get_confirmations(&self, tx_hash: &str, network: &Network) -> Result<u32> {
+    async fn get_confirmations(&self, _tx_hash: &str, _network: &Network) -> Result<u32> {
         Ok(6)
     }
 
-    fn verify_webhook(&self, payload: &[u8], signature: &str) -> Result<bool> {
+    fn verify_webhook(&self, _payload: &[u8], _signature: &str) -> Result<bool> {
         // Mock implementation
         Ok(true)
     }
 }
 
 /// CoinGate payment provider
+#[allow(dead_code)]
 pub struct CoinGateProvider {
     api_key: String,
     sandbox: bool,
@@ -650,11 +653,11 @@ impl CryptoPaymentProvider for CoinGateProvider {
         })
     }
 
-    async fn cancel_payment(&self, payment_id: &str) -> Result<bool> {
+    async fn cancel_payment(&self, _payment_id: &str) -> Result<bool> {
         Ok(true)
     }
 
-    async fn list_payments(&self, limit: Option<u32>) -> Result<Vec<CryptoPayment>> {
+    async fn list_payments(&self, _limit: Option<u32>) -> Result<Vec<CryptoPayment>> {
         Ok(Vec::new())
     }
 
@@ -714,11 +717,11 @@ impl CryptoPaymentProvider for CoinGateProvider {
         client.get_transaction(tx_hash).await
     }
 
-    async fn get_confirmations(&self, tx_hash: &str, network: &Network) -> Result<u32> {
+    async fn get_confirmations(&self, _tx_hash: &str, _network: &Network) -> Result<u32> {
         Ok(6)
     }
 
-    fn verify_webhook(&self, payload: &[u8], signature: &str) -> Result<bool> {
+    fn verify_webhook(&self, _payload: &[u8], _signature: &str) -> Result<bool> {
         // Mock implementation
         Ok(true)
     }

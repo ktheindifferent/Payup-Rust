@@ -6,7 +6,6 @@ use super::{
     FeePriority, wallet::WalletAddress, blockchain::Transaction
 };
 use async_trait::async_trait;
-use std::collections::HashMap;
 
 /// Bitcoin payment provider
 pub struct BitcoinProvider {
@@ -162,6 +161,13 @@ impl CryptoPaymentProvider for BitcoinProvider {
         let payment_id = format!("btc_{}", uuid::Uuid::new_v4());
         let expires_at = chrono::Utc::now().timestamp() + 900; // 15 minutes
 
+        let payment_uri = Some(self.create_payment_uri(
+            &wallet_address.address,
+            Some(request.amount.parse().unwrap_or(0.0)),
+            request.description.as_deref(),
+            None,
+        ));
+        
         Ok(CryptoPayment {
             id: payment_id,
             status: PaymentStatus::Pending,
@@ -172,12 +178,7 @@ impl CryptoPaymentProvider for BitcoinProvider {
             fiat_currency: None,
             exchange_rate: None,
             wallet_address: wallet_address.address,
-            payment_uri: Some(self.create_payment_uri(
-                &wallet_address.address,
-                Some(request.amount.parse().unwrap_or(0.0)),
-                request.description.as_deref(),
-                None,
-            )),
+            payment_uri,
             qr_code: None,
             transaction_hash: None,
             confirmations: 0,
@@ -213,12 +214,12 @@ impl CryptoPaymentProvider for BitcoinProvider {
         })
     }
 
-    async fn cancel_payment(&self, payment_id: &str) -> Result<bool> {
+    async fn cancel_payment(&self, _payment_id: &str) -> Result<bool> {
         // Mock implementation
         Ok(true)
     }
 
-    async fn list_payments(&self, limit: Option<u32>) -> Result<Vec<CryptoPayment>> {
+    async fn list_payments(&self, _limit: Option<u32>) -> Result<Vec<CryptoPayment>> {
         // Mock implementation
         Ok(Vec::new())
     }
@@ -297,7 +298,7 @@ impl CryptoPaymentProvider for BitcoinProvider {
         Ok(tx.confirmations)
     }
 
-    fn verify_webhook(&self, payload: &[u8], signature: &str) -> Result<bool> {
+    fn verify_webhook(&self, _payload: &[u8], _signature: &str) -> Result<bool> {
         // Mock implementation - in production, verify HMAC signature
         Ok(true)
     }
@@ -366,6 +367,7 @@ pub struct PsbtOutput {
 }
 
 /// Bitcoin RPC client for direct node communication
+#[allow(dead_code)]
 pub struct BitcoinRpcClient {
     url: String,
     auth: String,
@@ -388,17 +390,17 @@ impl BitcoinRpcClient {
         Ok("00000000000000000001234567890abcdef".to_string())
     }
 
-    pub async fn get_raw_transaction(&self, txid: &str) -> Result<String> {
+    pub async fn get_raw_transaction(&self, _txid: &str) -> Result<String> {
         // Mock implementation
         Ok("raw_tx_hex".to_string())
     }
 
-    pub async fn send_raw_transaction(&self, hex: &str) -> Result<String> {
+    pub async fn send_raw_transaction(&self, _hex: &str) -> Result<String> {
         // Mock implementation
         Ok("txid".to_string())
     }
 
-    pub async fn estimate_smart_fee(&self, conf_target: u32) -> Result<f64> {
+    pub async fn estimate_smart_fee(&self, _conf_target: u32) -> Result<f64> {
         // Mock implementation
         Ok(0.00001)
     }

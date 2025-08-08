@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::error::{PayupError, Result};
 use super::{Cryptocurrency, Network, Hash, Amount, Block, types::*};
-use std::collections::HashMap;
 
 /// Blockchain transaction
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,7 +130,7 @@ impl BlockchainClient {
     }
 
     /// Get address balance
-    pub async fn get_balance(&self, address: &str) -> Result<Amount> {
+    pub async fn get_balance(&self, _address: &str) -> Result<Amount> {
         // Mock implementation
         Ok(Amount::from_decimal(1.5, self.cryptocurrency.decimals()))
     }
@@ -139,8 +138,8 @@ impl BlockchainClient {
     /// Get address transactions
     pub async fn get_address_transactions(
         &self,
-        address: &str,
-        limit: Option<u32>,
+        _address: &str,
+        _limit: Option<u32>,
     ) -> Result<Vec<Transaction>> {
         // Mock implementation
         Ok(vec![])
@@ -176,7 +175,7 @@ impl BlockchainClient {
     }
 
     /// Subscribe to address notifications (WebSocket)
-    pub async fn subscribe_address(&self, address: &str) -> Result<()> {
+    pub async fn subscribe_address(&self, _address: &str) -> Result<()> {
         // Mock implementation - would connect to WebSocket in production
         Ok(())
     }
@@ -365,7 +364,7 @@ impl SmartContract {
     }
 
     /// Send a transaction to a contract function
-    pub async fn send(&self, function: &str, params: Vec<serde_json::Value>) -> Result<Hash> {
+    pub async fn send(&self, _function: &str, _params: Vec<serde_json::Value>) -> Result<Hash> {
         // Mock implementation
         Ok(Hash::new("mock_tx_hash".to_string()))
     }

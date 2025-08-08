@@ -67,7 +67,11 @@ impl Refund {
     /// Create a refund
     /// 
     /// # Example
-    /// ```no_run
+    /// ```ignore
+    /// use payup::stripe_ext::refund::{Refund, RefundReason};
+    /// use payup::stripe::Auth;
+    /// 
+    /// let auth = Auth::new("test_key".to_string(), "test_secret".to_string());
     /// let mut refund = Refund::new();
     /// refund.charge = Some("ch_test123".to_string());
     /// refund.amount = Some(1000); // Refund $10.00

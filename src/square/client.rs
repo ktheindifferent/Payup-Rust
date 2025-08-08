@@ -10,6 +10,7 @@ pub struct SquareClient {
     pub auth: SquareAuth,
     http_client: HttpClient,
     async_http_client: AsyncHttpClient,
+    #[allow(dead_code)]
     request_builder: HttpRequestBuilder,
 }
 
