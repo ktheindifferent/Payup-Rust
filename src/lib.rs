@@ -13,30 +13,30 @@
 // limitations under the License.
 
 //! ## Description
-//! 
+//!
 //! A synchronous + asynchronous payment library for processing payments with rust + stripe.
-//! 
-//! I built this library due to a lack of synchronous payment libraries. Currently im only focused on features I need for another project. 
-//! 
+//!
+//! I built this library due to a lack of synchronous payment libraries. Currently im only focused on features I need for another project.
+//!
 //! ## Current Stripe Features:
-//! 
+//!
 //! * Balance:
 //!     * Ability to fetch the account balance for your stripe account
-//! 
+//!
 //! * BalanceTransaction:
 //!     * Ability to retrieve a BalanceTransaction
 //!     * Ability to list all BalanceTransactions
-//! 
+//!
 //! * Card:
 //!     * Ability to attach a Card to a PaymentMethod
-//! 
+//!
 //! * Charge:
 //!     * Ability to retrieve a Charge
 //!     * Ability to list all Charges
 //!     * Ability to update an existing Charge
 //!     * Ability to create a new Charge
 //!     * Ability to capture a charge
-//! 
+//!
 //! * Customer:
 //!     * Ability to retrieve a Customer
 //!     * Ability to list all Customers
@@ -46,56 +46,55 @@
 //!     * Ability to attach payment methods to Customers
 //!     * Ability to list a customers invoices
 //!     * Ability to list a customers payment methods
-//! 
+//!
 //! * Dispute:
 //!     * Ability to retrieve a Dispute
 //!     * Ability to list all Disputes
 //!     * Ability to close a Dispute
 //!     * Ability to update an existing Dispute
-//! 
+//!
 //! * Event:
 //!     * Ability to retrieve an Event
 //!     * Ability to list all Events
-//! 
+//!
 //! * Files:
 //!     * Ability to retrieve a File
 //!     * Ability to list all Files
 //!     * Ability to create a File
-//! 
+//!
 //! * FileLink:
 //!     * Ability to retrieve a FileLink
 //!     * Ability to list all FileLinks
 //!     * Ability to create a FileLink
 //!     * Ability to update an existing FileLink
-//! 
+//!
 //! * Invoice:
 //!     * Ability to retrieve an Invoice
 //!     * Ability to list all Invoices
 //!     * Ability to create an Invoice
 //!     * Ability to update an existing Invoice
-//! 
+//!
 //! * Mandate:
 //!     * Ability to retrieve a Mandate
-//! 
+//!
 //! * PaymentMethod:
 //!     * Ability to retrieve a PaymentMethod
 //!     * Ability to create a new PaymentMethod
-//! 
+//!
 //! * Plan:
 //!     * Ability to retrieve a Plan
 //!     * Ability to list all Plan
 //!     * Ability to update an existing Plan
 //!     * Ability to create a new Plan
-//! 
+//!
 //! * Price
 //!     * Ability to create a new Price
-//! 
+//!
 //! * Subscription
 //!     * Ability to create a new Subscription
 //!     * Ability to retrieve a Subscription
 //!     * Ability to update an existing Subscription
 //!     * Ability to cancel a subscription
-
 
 /// Stripe API Implementation
 pub mod stripe;
