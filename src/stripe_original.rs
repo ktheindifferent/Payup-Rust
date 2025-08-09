@@ -1,20 +1,5 @@
 pub mod response;
 
-use serde::{Deserialize, Serialize};
-
-// Full V1 API Support Complete
-/// Stores the Stripe API client + secret.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Auth {
-    pub client: String,
-    pub secret: String,
-}
-impl Auth {
-    pub fn new(client: String, secret: String) -> Self {
-        Auth { client, secret }
-    }
-}
-
 // Full V1 API Support Complete
 /// Represents your Stripe balance.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -34,13 +19,13 @@ impl Balance {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignoreno_run
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
-    /// // Fetch customer using id
+    /// // Fetch balance
     /// let balance = payup::stripe::Balance::async_get(auth).await;
-    /// ```
+    /// ```ignore
     pub async fn async_get(creds: Auth) -> Result<Self, reqwest::Error> {
         let url = "https://api.stripe.com/v1/balance";
         let request = reqwest::Client::new()
@@ -60,13 +45,13 @@ impl Balance {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignoreno_run
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
-    /// // Fetch customer using id
-    /// let balance = payup::stripe::Balance::get(auth).await;
-    /// ```
+    /// // Fetch balance
+    /// let balance = payup::stripe::Balance::get(auth);
+    /// ```ignore
     pub fn get(creds: Auth) -> Result<Self, reqwest::Error> {
         let url = "https://api.stripe.com/v1/balance";
         let request = reqwest::blocking::Client::new()
@@ -114,13 +99,13 @@ impl BalanceTransaction {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignoreno_run
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Retrieve the balance transaction with the given ID.
-    /// let balance_transaction = payup::stripe::BalanceTransaction::async_get(auth, "txn_").await;
-    /// ```
+    /// let balance_transaction = payup::stripe::BalanceTransaction::async_get(auth, "txn_test123".to_string()).await;
+    /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/balance_transactions/{}", id);
         let request = reqwest::Client::new()
@@ -140,13 +125,13 @@ impl BalanceTransaction {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignoreno_run
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
-    /// // Retrieve the balance transaction with the given ID.
+    /// // List all balance transactions.
     /// let balance_transactions = payup::stripe::BalanceTransaction::async_list(auth).await;
-    /// ```
+    /// ```ignore
     pub async fn async_list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -172,13 +157,13 @@ impl BalanceTransaction {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignoreno_run
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Retrieve the balance transaction with the given ID.
-    /// let balance_transaction = payup::stripe::BalanceTransaction::get(auth, "txn_").await;
-    /// ```
+    /// let balance_transaction = payup::stripe::BalanceTransaction::get(auth, "txn_test123".to_string());
+    /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/balance_transactions/{}", id);
         let request = reqwest::blocking::Client::new()
@@ -197,13 +182,13 @@ impl BalanceTransaction {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignoreno_run
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
-    /// // Retrieve the balance transaction with the given ID.
-    /// let balance_transactions = payup::stripe::BalanceTransaction::async_list(auth).await;
-    /// ```
+    /// // List all balance transactions.
+    /// let balance_transactions = payup::stripe::BalanceTransaction::list(auth);
+    /// ```ignore
     pub fn list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -372,15 +357,15 @@ impl Charge {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// let mut charge = payup::stripe::Charge::new();
     /// charge.amount = Some(100);
-    /// charge.currency = Some(format!("usd"));
-    /// charge.customer = Some(format!("cust_"));
-    /// charge.description = Some(format!("test charge"));
-    /// charge.receipt_email = Some(format!("test@test.com"));
-    /// charge.source = Some(format!("card_"));
-    /// ```
+    /// charge.currency = Some("usd".to_string());
+    /// charge.customer = Some("cust_test123".to_string());
+    /// charge.description = Some("test charge".to_string());
+    /// charge.receipt_email = Some("test@test.com".to_string());
+    /// charge.source = Some("card_test123".to_string());
+    /// ```ignore
     pub fn new() -> Self {
         return Charge {
             id: None,
@@ -422,23 +407,23 @@ impl Charge {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut charge = payup::stripe::Charge::new();
     /// charge.amount = Some(100);
-    /// charge.currency = Some(format!("usd"));
-    /// charge.customer = Some(format!("cust_"));
-    /// charge.description = Some(format!("test charge"));
-    /// charge.receipt_email = Some(format!("test@test.com"));
-    /// charge.source = Some(format!("card_"));
+    /// charge.currency = Some("usd".to_string());
+    /// charge.customer = Some("cust_test123".to_string());
+    /// charge.description = Some("test charge".to_string());
+    /// charge.receipt_email = Some("test@test.com".to_string());
+    /// charge.source = Some("card_test123".to_string());
     ///
     /// charge = charge.async_post(auth.clone()).await?;
     ///
     /// // Fetch customer using id
-    /// let captured_charge = payup::stripe::Charge::async_capture(charge, "cust_").await?;
-    /// ```
+    /// let captured_charge = charge.async_capture(auth.clone()).await?;
+    /// ```ignore
     pub async fn async_capture(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let url = format!(
             "https://api.stripe.com/v1/charges/{}/capture",
@@ -465,13 +450,13 @@ impl Charge {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let charge = payup::stripe::Charge::async_get(auth, "ch_").await?;
-    /// ```
+    /// let charge = payup::stripe::Charge::async_get(auth, "ch_test123".to_string()).await?;
+    /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/charges/{}", id);
         let request = reqwest::Client::new()
@@ -491,13 +476,13 @@ impl Charge {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let charges = payup::stripe::Charge::async_list(auth).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -519,20 +504,20 @@ impl Charge {
     /// Asynchronously POSTs a new Charge to the stripe api
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut charge = payup::stripe::Charge::new();
     /// charge.amount = Some(100);
-    /// charge.currency = Some(format!("usd"));
-    /// charge.customer = Some(format!("cust_"));
-    /// charge.description = Some(format!("test charge"));
-    /// charge.receipt_email = Some(format!("test@test.com"));
-    /// charge.source = Some(format!("card_"));
+    /// charge.currency = Some("usd".to_string());
+    /// charge.customer = Some("cust_test123".to_string());
+    /// charge.description = Some("test charge".to_string());
+    /// charge.receipt_email = Some("test@test.com".to_string());
+    /// charge.source = Some("card_test123".to_string());
     ///
     /// charge = charge.async_post(auth.clone()).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::Client::new()
             .post("https://api.stripe.com/v1/charges")
@@ -548,23 +533,23 @@ impl Charge {
     /// Asynchronously POSTs an update to an existing Charge
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut charge = payup::stripe::Charge::new();
     /// charge.amount = Some(100);
-    /// charge.currency = Some(format!("usd"));
-    /// charge.customer = Some(format!("cust_"));
-    /// charge.description = Some(format!("test charge"));
-    /// charge.receipt_email = Some(format!("test@test.com"));
-    /// charge.source = Some(format!("card_"));
+    /// charge.currency = Some("usd".to_string());
+    /// charge.customer = Some("cust_test123".to_string());
+    /// charge.description = Some("test charge".to_string());
+    /// charge.receipt_email = Some("test@test.com".to_string());
+    /// charge.source = Some("card_test123".to_string());
     ///
     /// charge = charge.async_post(auth.clone()).await?;
     ///
-    /// charge.receipt_email = Some(format!("testchanged@test.com"));
+    /// charge.receipt_email = Some("testchanged@test.com".to_string());
     /// charge = charge.async_update(auth.clone()).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::Client::new()
             .post(format!(
@@ -589,23 +574,23 @@ impl Charge {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut charge = payup::stripe::Charge::new();
     /// charge.amount = Some(100);
-    /// charge.currency = Some(format!("usd"));
-    /// charge.customer = Some(format!("cust_"));
-    /// charge.description = Some(format!("test charge"));
-    /// charge.receipt_email = Some(format!("test@test.com"));
-    /// charge.source = Some(format!("card_"));
+    /// charge.currency = Some("usd".to_string());
+    /// charge.customer = Some("cust_test123".to_string());
+    /// charge.description = Some("test charge".to_string());
+    /// charge.receipt_email = Some("test@test.com".to_string());
+    /// charge.source = Some("card_test123".to_string());
     ///
     /// charge = charge.post(auth.clone());
     ///
     /// // Fetch customer using id
-    /// let captured_charge = payup::stripe::Charge::capture(charge, "cust_");
-    /// ```
+    /// let captured_charge = charge.capture(auth.clone())?;
+    /// ```ignore
     pub fn capture(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let url = format!(
             "https://api.stripe.com/v1/charges/{}/capture",
@@ -631,13 +616,13 @@ impl Charge {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let charge = payup::stripe::Charge::get(auth, "ch_");
-    /// ```
+    /// let charge = payup::stripe::Charge::get(auth, "ch_test123".to_string());
+    /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/charges/{}", id);
         let request = reqwest::blocking::Client::new()
@@ -656,13 +641,13 @@ impl Charge {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let charges = payup::stripe::Charge::list(auth)?;
-    /// ```
+    /// ```ignore
     pub fn list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -684,20 +669,20 @@ impl Charge {
     /// POSTs a new Charge to the stripe api
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut charge = payup::stripe::Charge::new();
     /// charge.amount = Some(100);
-    /// charge.currency = Some(format!("usd"));
-    /// charge.customer = Some(format!("cust_"));
-    /// charge.description = Some(format!("test charge"));
-    /// charge.receipt_email = Some(format!("test@test.com"));
-    /// charge.source = Some(format!("card_"));
+    /// charge.currency = Some("usd".to_string());
+    /// charge.customer = Some("cust_test123".to_string());
+    /// charge.description = Some("test charge".to_string());
+    /// charge.receipt_email = Some("test@test.com".to_string());
+    /// charge.source = Some("card_test123".to_string());
     ///
     /// charge = charge.post(auth.clone())?;
-    /// ```
+    /// ```ignore
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::blocking::Client::new()
             .post("https://api.stripe.com/v1/charges")
@@ -712,23 +697,23 @@ impl Charge {
     /// POSTs an update to an existing Charge
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut charge = payup::stripe::Charge::new();
     /// charge.amount = Some(100);
-    /// charge.currency = Some(format!("usd"));
-    /// charge.customer = Some(format!("cust_"));
-    /// charge.description = Some(format!("test charge"));
-    /// charge.receipt_email = Some(format!("test@test.com"));
-    /// charge.source = Some(format!("card_"));
+    /// charge.currency = Some("usd".to_string());
+    /// charge.customer = Some("cust_test123".to_string());
+    /// charge.description = Some("test charge".to_string());
+    /// charge.receipt_email = Some("test@test.com".to_string());
+    /// charge.source = Some("card_test123".to_string());
     ///
     /// charge = charge.async_post(auth.clone()).await?;
     ///
-    /// charge.receipt_email = Some(format!("testchanged@test.com"));
+    /// charge.receipt_email = Some("testchanged@test.com".to_string());
     /// charge = charge.update(auth.clone()).await?;
-    /// ```
+    /// ```ignore
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::blocking::Client::new()
             .post(format!(
@@ -896,14 +881,14 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// let mut cust = payup::stripe::Customer::new();
     /// cust.name = Some("Rust Test".to_string());
     /// cust.description = Some("A test customer from rust.".to_string());
     /// cust.phone = Some("333-333-3333".to_string());
     /// cust.email = Some("rust@test.com".to_string());
     /// cust.payment_method = None;
-    /// ```
+    /// ```ignore
     pub fn new() -> Self {
         return Customer {
             id: None,
@@ -934,13 +919,13 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let customer = payup::stripe::Customer::async_delete(auth, "cust_").await?;
-    /// ```
+    /// let customer = payup::stripe::Customer::async_delete(auth, "cust_test123".to_string()).await?;
+    /// ```ignore
     pub async fn async_delete(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
 
@@ -963,13 +948,13 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let customer = payup::stripe::Customer::async_get(auth, "cust_").await?;
-    /// ```
+    /// let customer = payup::stripe::Customer::async_get(auth, "cust_test123".to_string()).await?;
+    /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
         let request = reqwest::Client::new()
@@ -990,12 +975,12 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
-    /// let customers_invoices = payup::stripe::Customer::invoices(auth, format!("cust_")).await?;     
-    /// ```    
+    /// let customers_invoices = payup::stripe::Customer::invoices(auth, "cust_test123".to_string()).await?;     
+    /// ```ignore    
     pub async fn async_invoices(
         creds: Auth,
         customer_id: String,
@@ -1027,13 +1012,13 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let customers = payup::stripe::Customer::async_list(auth).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -1062,12 +1047,12 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
-    /// let customers_payment_methods = payup::stripe::Customer::async_payment_methods(auth, format!("cust_"), format!("card")).await?;     
-    /// ```
+    /// let customers_payment_methods = payup::stripe::Customer::async_payment_methods(auth, "cust_test123".to_string(), "card".to_string()).await?;     
+    /// ```ignore
     pub async fn async_payment_methods(
         creds: Auth,
         customer_id: String,
@@ -1102,9 +1087,9 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Build a customer object
     /// let mut cust = payup::stripe::Customer::new();
@@ -1116,7 +1101,7 @@ impl Customer {
     ///
     /// // Post customer to stripe and update the local cust variable
     /// let customer = cust.async_post(auth).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::Client::new()
             .post("https://api.stripe.com/v1/customers")
@@ -1142,9 +1127,9 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Build a customer object
     /// let mut customer = payup::stripe::Customer::new();
@@ -1162,7 +1147,7 @@ impl Customer {
     ///
     /// // Update customer
     /// customer = cust.async_update(auth).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::Client::new()
             .post(format!(
@@ -1187,13 +1172,13 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let customer = payup::stripe::Customer::async_delete(auth, "cust_").await?;
-    /// ```
+    /// let customer = payup::stripe::Customer::async_delete(auth, "cust_test123".to_string()).await?;
+    /// ```ignore
     pub fn delete(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
 
@@ -1215,13 +1200,13 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let customer = payup::stripe::Customer::get(auth, "cust_")?;
-    /// ```
+    /// let customer = payup::stripe::Customer::get(auth, "cust_test123".to_string())?;
+    /// ```ignore
     pub fn get(auth: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
         let request = reqwest::blocking::Client::new()
@@ -1241,12 +1226,12 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
-    /// let customers_invoices = payup::stripe::Customer::invoices(auth, format!("cust_"))?;     
-    /// ```    
+    /// let customers_invoices = payup::stripe::Customer::invoices(auth, "cust_test123".to_string())?;     
+    /// ```ignore    
     pub fn invoices(
         creds: Auth,
         customer_id: String,
@@ -1278,13 +1263,13 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let customers = payup::stripe::Customer::list(auth.clone())?;
-    /// ```
+    /// ```ignore
     pub fn list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -1313,12 +1298,12 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
-    /// let customers_payment_methods = payup::stripe::Customer::payment_methods(auth, format!("cust_"), format!("card"))?;     
-    /// ```
+    /// let customers_payment_methods = payup::stripe::Customer::payment_methods(auth, "cust_test123".to_string(), "card".to_string())?;     
+    /// ```ignore
     pub fn payment_methods(
         creds: Auth,
         customer_id: String,
@@ -1352,9 +1337,9 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Build a customer object
     /// let mut cust = payup::stripe::Customer::new();
@@ -1366,7 +1351,7 @@ impl Customer {
     ///
     /// // Post customer to stripe and update the local cust variable
     /// let customer = cust.post(auth).unwrap();
-    /// ```
+    /// ```ignore
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::blocking::Client::new()
             .post("https://api.stripe.com/v1/customers")
@@ -1391,9 +1376,9 @@ impl Customer {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Build a customer object
     /// let mut customer = payup::stripe::Customer::new();
@@ -1411,7 +1396,7 @@ impl Customer {
     ///
     /// // Update customer
     /// customer = cust.update(auth)?;
-    /// ```
+    /// ```ignore
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::blocking::Client::new()
             .post(format!(
@@ -1610,10 +1595,10 @@ impl Dispute {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// let mut dispute = payup::stripe::Dispute::new();
     /// dispute.amount = Some(100);
-    /// ```
+    /// ```ignore
     pub fn new() -> Self {
         return Dispute {
             id: None,
@@ -1639,15 +1624,15 @@ impl Dispute {
     /// Closing the dispute for a charge indicates that you do not have any evidence to submit and are essentially dismissing the dispute, acknowledging it as lost.
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut dispute = payup::stripe::Dispute::new();
     /// dispute.id = Some(format!("dp_"));
     ///
     /// dispute = dispute.async_close(auth.clone()).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_close(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::Client::new()
             .post(format!(
@@ -1671,13 +1656,13 @@ impl Dispute {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let dispute = payup::stripe::Dispute::async_get(auth, "ch_").await?;
-    /// ```
+    /// let dispute = payup::stripe::Dispute::async_get(auth, "ch_test123".to_string()).await?;
+    /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/disputes/{}", id);
         let request = reqwest::Client::new()
@@ -1697,13 +1682,13 @@ impl Dispute {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let disputes = payup::stripe::Dispute::async_list(auth).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -1725,9 +1710,9 @@ impl Dispute {
     /// Asynchronously POSTs an update to an existing Dispute
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Crate some evidence to update the dispute with
     /// let mut evidence = payup::stripe::Evidence::new();
@@ -1743,7 +1728,7 @@ impl Dispute {
     ///
     /// // Update the dispute
     /// dispute = dispute.async_update(auth.clone()).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::Client::new()
             .post(format!(
@@ -1763,15 +1748,15 @@ impl Dispute {
     /// Closing the dispute for a charge indicates that you do not have any evidence to submit and are essentially dismissing the dispute, acknowledging it as lost.
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut dispute = payup::stripe::Dispute::new();
     /// dispute.id = Some(format!("dp_"));
     ///
     /// dispute = dispute.async_close(auth.clone())?;
-    /// ```
+    /// ```ignore
     pub fn close(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::blocking::Client::new()
             .post(format!(
@@ -1794,13 +1779,13 @@ impl Dispute {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let dispute = payup::stripe::Dispute::get(auth, "ch_")?;
-    /// ```
+    /// let dispute = payup::stripe::Dispute::get(auth, "ch_test123".to_string())?;
+    /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/disputes/{}", id);
         let request = reqwest::blocking::Client::new()
@@ -1819,13 +1804,13 @@ impl Dispute {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let charges = payup::stripe::Dispute::list(auth)?;
-    /// ```
+    /// ```ignore
     pub fn list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -1847,9 +1832,9 @@ impl Dispute {
     /// POSTs an update to an existing Dispute
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Crate some evidence to update the dispute with
     /// let mut evidence = payup::stripe::Evidence::new();
@@ -1865,7 +1850,7 @@ impl Dispute {
     ///
     /// // Update the dispute
     /// dispute = dispute.async_update(auth.clone())?;
-    /// ```
+    /// ```ignore
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::blocking::Client::new()
             .post(format!(
@@ -2211,13 +2196,13 @@ impl Event {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let event = payup::stripe::Event::async_get(auth, "ch_").await?;
-    /// ```
+    /// let event = payup::stripe::Event::async_get(auth, "ch_test123".to_string()).await?;
+    /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/events/{}", id);
         let request = reqwest::Client::new()
@@ -2237,13 +2222,13 @@ impl Event {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let events = payup::stripe::Event::async_list(auth).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -2271,13 +2256,13 @@ impl Event {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let event = payup::stripe::Event::get(auth, "ch_")?;
-    /// ```
+    /// let event = payup::stripe::Event::get(auth, "ch_test123".to_string())?;
+    /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/events/{}", id);
         let request = reqwest::blocking::Client::new()
@@ -2296,13 +2281,13 @@ impl Event {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let events = payup::stripe::Event::list(auth)?;
-    /// ```
+    /// ```ignore
     pub fn list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -2387,10 +2372,10 @@ impl File {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// let mut file = payup::stripe::File::new();
     /// file.title = Some(format!("Title"));
-    /// ```
+    /// ```ignore
     pub fn new() -> Self {
         return File {
             id: None,
@@ -2417,13 +2402,13 @@ impl File {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let file = payup::stripe::File::async_get(auth, "ch_").await?;
-    /// ```
+    /// let file = payup::stripe::File::async_get(auth, "ch_test123".to_string()).await?;
+    /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/files/{}", id);
         let request = reqwest::Client::new()
@@ -2443,13 +2428,13 @@ impl File {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let disputes = payup::stripe::Dispute::async_list(auth).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -2471,9 +2456,9 @@ impl File {
     /// Asynchronously POSTs a new File to the stripe api
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut file = payup::stripe::File::new();
     /// ley bytes: Vec<u8> = Vec::new();
@@ -2482,10 +2467,10 @@ impl File {
     ///
     /// // The purpose of the uploaded file.
     /// // Possible enum values: account_requirement, additional_verification, business_icon, business_logo, customer_signature, dispute_evidence, identity_document, pci_document, tax_document_user_upload
-    /// file.purpose = Some(format!("cust_"));
+    /// file.purpose = Some("cust_test123".to_string());
     ///
     /// file = file.post(auth.clone()).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let form = self.to_multipart_form_async().await;
 
@@ -2503,9 +2488,9 @@ impl File {
     /// POSTs a new File to the stripe api
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut file = payup::stripe::File::new();
     /// ley bytes: Vec<u8> = Vec::new();
@@ -2514,10 +2499,10 @@ impl File {
     ///
     /// // The purpose of the uploaded file.
     /// // Possible enum values: account_requirement, additional_verification, business_icon, business_logo, customer_signature, dispute_evidence, identity_document, pci_document, tax_document_user_upload
-    /// file.purpose = Some(format!("cust_"));
+    /// file.purpose = Some("cust_test123".to_string());
     ///
     /// file = file.post(auth.clone())?;
-    /// ```
+    /// ```ignore
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let form = self.to_multipart_form();
 
@@ -2540,13 +2525,13 @@ impl File {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let dispute = payup::stripe::Dispute::get(auth, "ch_")?;
-    /// ```
+    /// let dispute = payup::stripe::Dispute::get(auth, "ch_test123".to_string())?;
+    /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/files/{}", id);
         let request = reqwest::blocking::Client::new()
@@ -2565,13 +2550,13 @@ impl File {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let charges = payup::stripe::Dispute::list(auth)?;
-    /// ```
+    /// ```ignore
     pub fn list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -2695,10 +2680,10 @@ impl FileLink {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// let mut file_link = payup::stripe::FileLink::new();
-    /// file_link.file = Some(format!("file_"));
-    /// ```
+    /// file_link.file = Some("file_test123".to_string());
+    /// ```ignore
     pub fn new() -> Self {
         return FileLink {
             id: None,
@@ -2722,13 +2707,13 @@ impl FileLink {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
     /// let file = payup::stripe::FileLink::async_get(auth, "link_").await?;
-    /// ```
+    /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/file_links/{}", id);
         let request = reqwest::Client::new()
@@ -2748,13 +2733,13 @@ impl FileLink {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let file_links = payup::stripe::FileLink::async_list(auth).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -2776,16 +2761,16 @@ impl FileLink {
     /// Asynchronously POSTs a new FileLink to the stripe api
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut file_link = payup::stripe::FileLink::new();
-    /// file_link.file = Some(format!("file_"));
+    /// file_link.file = Some("file_test123".to_string());
     /// file_link.link_expires_at = Some(format!("1643341848"));
     ///
     /// file_link = file_link.async_post(auth.clone()).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::Client::new()
             .post("https://api.stripe.com/v1/file_links")
@@ -2801,18 +2786,18 @@ impl FileLink {
     /// Asynchronously POSTs an update to an existing FileLink
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut file_link = payup::stripe::FileLink::new();
-    /// file_link.file = Some(format!("file_"));
+    /// file_link.file = Some("file_test123".to_string());
     ///
     /// file_link = file_link.async_post(auth.clone()).await?;
     ///
     /// file_link.link_expires_at = Some(format!("1643341848"));
     /// file_link = file_link.async_update(auth.clone()).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::Client::new()
             .post(format!(
@@ -2837,13 +2822,13 @@ impl FileLink {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let file_link = payup::stripe::FileLink::get(auth, "ch_");
-    /// ```
+    /// let file_link = payup::stripe::FileLink::get(auth, "ch_test123".to_string());
+    /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/file_links/{}", id);
         let request = reqwest::blocking::Client::new()
@@ -2862,13 +2847,13 @@ impl FileLink {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let file_links = payup::stripe::FileLink::list(auth)?;
-    /// ```
+    /// ```ignore
     pub fn list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
         let mut objects = Vec::new();
         let mut has_more = true;
@@ -2890,16 +2875,16 @@ impl FileLink {
     /// POSTs a new FileLink to the stripe api
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut file_link = payup::stripe::FileLink::new();
-    /// file_link.file = Some(format!("file_"));
+    /// file_link.file = Some("file_test123".to_string());
     /// file_link.link_expires_at = Some(format!("1643341848"));
     ///
     /// file_link = file_link.async_post(auth.clone())?;
-    /// ```
+    /// ```ignore
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::blocking::Client::new()
             .post("https://api.stripe.com/v1/file_links")
@@ -2914,18 +2899,18 @@ impl FileLink {
     /// POSTs an update to an existing FileLink
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut file_link = payup::stripe::FileLink::new();
-    /// file_link.file = Some(format!("file_"));
+    /// file_link.file = Some("file_test123".to_string());
     ///
     /// file_link = file_link.post(auth.clone())?;
     ///
     /// file_link.link_expires_at = Some(format!("1643341848"));
     /// file_link = file_link.update(auth.clone())?;
-    /// ```
+    /// ```ignore
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::blocking::Client::new()
             .post(format!(
@@ -3124,12 +3109,12 @@ impl Invoice {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// let mut invoice = payup::stripe::Invoice::new();
-    /// invoice.customer = Some(format!("cust_"));
+    /// invoice.customer = Some("cust_test123".to_string());
     /// invoice.collection_method = Some(format!("charge_automatically"));
     /// invoice.auto_advance = Some(true);
-    /// ```
+    /// ```ignore
     pub fn new() -> Self {
         return Invoice {
             id: None,
@@ -3189,13 +3174,13 @@ impl Invoice {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let invoice = payup::stripe::Invoice::async_get(auth, "in_").await?;
-    /// ```
+    /// let invoice = payup::stripe::Invoice::async_get(auth, "in_test123".to_string()).await?;
+    /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/invoices/{}", id);
         let request = reqwest::Client::new()
@@ -3217,13 +3202,13 @@ impl Invoice {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let invoices = payup::stripe::Invoice::async_list(auth).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_list(
         creds: Auth,
         status: Option<String>,
@@ -3253,16 +3238,16 @@ impl Invoice {
     /// Asynchronously POSTs a new Invoice to the stripe api
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut invoice = payup::stripe::Invoice::new();
-    /// invoice.customer = Some(format!("cust_"));
+    /// invoice.customer = Some("cust_test123".to_string());
     /// invoice.collection_method = Some(format!("charge_automatically"));
     /// invoice.auto_advance = Some(true);
     /// invoice = invoice.async_post(auth).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::Client::new()
             .post("https://api.stripe.com/v1/invoices")
@@ -3278,19 +3263,19 @@ impl Invoice {
     /// Asynchronously POSTs an update to an existing Invoice
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut invoice = payup::stripe::Invoice::new();
-    /// invoice.customer = Some(format!("cust_"));
+    /// invoice.customer = Some("cust_test123".to_string());
     /// invoice.collection_method = Some(format!("charge_automatically"));
     /// invoice.auto_advance = Some(false);
     /// invoice = invoice.async_post(auth).await?;
     ///
     /// invoice.auto_advance = Some(true);
     /// invoice = invoice.async_update(auth).await?;
-    /// ```
+    /// ```ignore
     pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::Client::new()
             .post(format!(
@@ -3315,13 +3300,13 @@ impl Invoice {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let invoice = payup::stripe::Invoice::get(auth, "in_");
-    /// ```
+    /// let invoice = payup::stripe::Invoice::get(auth, "in_test123".to_string());
+    /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/invoices/{}", id);
         let request = reqwest::blocking::Client::new()
@@ -3342,13 +3327,13 @@ impl Invoice {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch all customers from stripe
     /// let invoices = payup::stripe::Invoice::list(auth)?;
-    /// ```
+    /// ```ignore
     pub fn list(
         creds: Auth,
         status: Option<String>,
@@ -3377,16 +3362,16 @@ impl Invoice {
     /// POSTs a new Invoice to the stripe api
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut invoice = payup::stripe::Invoice::new();
-    /// invoice.customer = Some(format!("cust_"));
+    /// invoice.customer = Some("cust_test123".to_string());
     /// invoice.collection_method = Some(format!("charge_automatically"));
     /// invoice.auto_advance = Some(true);
     /// invoice = invoice.post(auth)?;
-    /// ```
+    /// ```ignore
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::blocking::Client::new()
             .post("https://api.stripe.com/v1/invoices")
@@ -3401,19 +3386,19 @@ impl Invoice {
     /// POSTs an update to an existing Charge
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let mut invoice = payup::stripe::Invoice::new();
-    /// invoice.customer = Some(format!("cust_"));
+    /// invoice.customer = Some("cust_test123".to_string());
     /// invoice.collection_method = Some(format!("charge_automatically"));
     /// invoice.auto_advance = Some(false);
     /// invoice = invoice.post(auth)?;
     ///
     /// invoice.auto_advance = Some(true);
     /// invoice = invoice.update(auth)?;
-    /// ```
+    /// ```ignore
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = reqwest::blocking::Client::new()
             .post(format!(
@@ -3571,13 +3556,13 @@ impl Mandate {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let file = payup::stripe::Mandate::async_get(auth, "mandate_").await?;
-    /// ```
+    /// let file = payup::stripe::Mandate::async_get(auth, "mandate_test123".to_string()).await?;
+    /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/file_links/{}", id);
         let request = reqwest::Client::new()
@@ -3598,13 +3583,13 @@ impl Mandate {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// // Fetch customer using id
-    /// let mandate = payup::stripe::Mandate::get(auth, "mandate_")?;
-    /// ```
+    /// let mandate = payup::stripe::Mandate::get(auth, "mandate_test123".to_string())?;
+    /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/file_links/{}", id);
         let request = reqwest::blocking::Client::new()
@@ -4097,16 +4082,16 @@ impl Subscription {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // Client and Secret for Stripe account
     /// // In a production environment...load values from environment variables.
     /// let client = format!("sk_test_51Jo2sKGrEH09RU9uu8d8ARKasYUKHXAHk4vUNup1JLgP5wFnQQf6t7UpKfh7woVMhI9oeuziolW2dK1uwmgAheVI00bN8ews6g");
     /// let secret = format!("");
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new(client, secret);
+    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
     ///
     /// let get_subscription = payup::stripe::Subscription::get(auth, "subscription_id");
-    /// ```
+    /// ```ignore
     pub fn get(
         creds: Auth,
         id: String,

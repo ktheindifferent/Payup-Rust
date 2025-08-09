@@ -14,6 +14,7 @@ pub struct PayPalAuth {
     pub created_at: std::time::Instant,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 struct TokenRequest {
     grant_type: String,

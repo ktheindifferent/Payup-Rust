@@ -4,10 +4,8 @@ use super::{
     CryptoPaymentProvider, CryptoPaymentRequest, CryptoPayment,
     Cryptocurrency, Network, PaymentStatus, PriceData, FeeEstimate,
     FeePriority, wallet::WalletAddress, blockchain::Transaction,
-    types::*,
 };
 use async_trait::async_trait;
-use std::collections::HashMap;
 
 /// Ethereum payment provider with support for ETH and ERC-20 tokens
 pub struct EthereumProvider {
@@ -101,9 +99,9 @@ impl EthereumProvider {
     /// Estimate gas for a transaction
     pub async fn estimate_gas(
         &self,
-        from: &str,
-        to: &str,
-        value: Option<&str>,
+        _from: &str,
+        _to: &str,
+        _value: Option<&str>,
         data: Option<&str>,
     ) -> Result<u64> {
         // Mock implementation - in production, use JSON-RPC
@@ -137,8 +135,8 @@ impl EthereumProvider {
     /// Get ERC-20 token balance
     pub async fn get_token_balance(
         &self,
-        token_address: &str,
-        wallet_address: &str,
+        _token_address: &str,
+        _wallet_address: &str,
     ) -> Result<String> {
         // Mock implementation
         Ok("1000000".to_string()) // 1 USDC (6 decimals)
@@ -193,7 +191,7 @@ impl EthereumProvider {
     pub async fn wait_for_transaction(
         &self,
         tx_hash: &str,
-        confirmations_required: u32,
+        _confirmations_required: u32,
     ) -> Result<TransactionReceipt> {
         // Mock implementation
         Ok(TransactionReceipt {
@@ -211,7 +209,7 @@ impl EthereumProvider {
     }
 
     /// Get account nonce
-    pub async fn get_nonce(&self, address: &str) -> Result<u64> {
+    pub async fn get_nonce(&self, _address: &str) -> Result<u64> {
         // Mock implementation
         Ok(1)
     }
@@ -219,7 +217,7 @@ impl EthereumProvider {
     /// Sign transaction (requires private key)
     pub fn sign_transaction(
         &self,
-        tx: &EthereumTransaction,
+        _tx: &EthereumTransaction,
         private_key: &str,
     ) -> Result<String> {
         // Mock implementation - in production, use proper signing
@@ -332,11 +330,11 @@ impl CryptoPaymentProvider for EthereumProvider {
         })
     }
 
-    async fn cancel_payment(&self, payment_id: &str) -> Result<bool> {
+    async fn cancel_payment(&self, _payment_id: &str) -> Result<bool> {
         Ok(true)
     }
 
-    async fn list_payments(&self, limit: Option<u32>) -> Result<Vec<CryptoPayment>> {
+    async fn list_payments(&self, _limit: Option<u32>) -> Result<Vec<CryptoPayment>> {
         Ok(Vec::new())
     }
 
@@ -424,7 +422,7 @@ impl CryptoPaymentProvider for EthereumProvider {
         Ok(tx.confirmations)
     }
 
-    fn verify_webhook(&self, payload: &[u8], signature: &str) -> Result<bool> {
+    fn verify_webhook(&self, _payload: &[u8], _signature: &str) -> Result<bool> {
         // Mock implementation - in production, verify HMAC signature
         Ok(true)
     }
@@ -508,6 +506,7 @@ pub struct PriorityFees {
 }
 
 /// ENS (Ethereum Name Service) resolver
+#[allow(dead_code)]
 pub struct EnsResolver {
     network: Network,
 }
@@ -528,13 +527,14 @@ impl EnsResolver {
     }
 
     /// Reverse resolve address to ENS name
-    pub async fn reverse_resolve(&self, address: &str) -> Result<Option<String>> {
+    pub async fn reverse_resolve(&self, _address: &str) -> Result<Option<String>> {
         // Mock implementation
         Ok(Some("vitalik.eth".to_string()))
     }
 }
 
 /// Web3 provider for direct Ethereum interaction
+#[allow(dead_code)]
 pub struct Web3Provider {
     rpc_url: String,
 }
@@ -545,7 +545,7 @@ impl Web3Provider {
     }
 
     /// Call JSON-RPC method
-    pub async fn call(&self, method: &str, params: Vec<serde_json::Value>) -> Result<serde_json::Value> {
+    pub async fn call(&self, _method: &str, _params: Vec<serde_json::Value>) -> Result<serde_json::Value> {
         // Mock implementation
         Ok(serde_json::json!({
             "jsonrpc": "2.0",

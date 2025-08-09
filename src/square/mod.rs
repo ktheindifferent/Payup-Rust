@@ -5,7 +5,6 @@ pub mod customers;
 pub mod catalog;
 
 use serde::{Deserialize, Serialize};
-use crate::error::Result;
 
 pub use auth::SquareAuth;
 pub use client::SquareClient;

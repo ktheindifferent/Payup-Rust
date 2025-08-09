@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::error::Result;
-use super::{SquareClient, Money, Address};
+use super::{SquareClient, Money};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Payment {

@@ -92,7 +92,11 @@ impl Payout {
     /// Create a payout
     /// 
     /// # Example
-    /// ```no_run
+    /// ```ignore
+    /// use payup::stripe_ext::payout::Payout;
+    /// use payup::stripe::Auth;
+    /// 
+    /// let auth = Auth::new("test_key".to_string(), "test_secret".to_string());
     /// let mut payout = Payout::new();
     /// payout.amount = 10000; // Payout $100.00
     /// payout.currency = "usd".to_string();

@@ -779,6 +779,7 @@ dependencies = [
  "hex",
  "hmac",
  "log",
+ "once_cell",
  "rand",
  "reqwest",
  "serde",

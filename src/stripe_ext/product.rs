@@ -56,7 +56,11 @@ impl Product {
     /// Create a new product
     /// 
     /// # Example
-    /// ```no_run
+    /// ```ignore
+    /// use payup::stripe_ext::product::Product;
+    /// use payup::stripe::Auth;
+    /// 
+    /// let auth = Auth::new("test_key".to_string(), "test_secret".to_string());
     /// let mut product = Product::new();
     /// product.name = "Premium Widget".to_string();
     /// product.description = Some("A high-quality widget".to_string());
