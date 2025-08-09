@@ -1,4 +1,5 @@
 pub mod response;
+pub mod webhooks;
 
 // Core modules
 pub mod account;
@@ -28,3 +29,4 @@ pub use payment_method::PaymentMethod;
 pub use plan::{Plan, Price};
 pub use subscription::Subscription;
 pub use transfer::{Transfer, TransferReversal, TransferReversalList, CreateTransferParams, UpdateTransferParams, CreateReversalParams};
+pub use webhooks::{StripeWebhookHandler, WebhookEvent, WebhookEventType, WebhookEventData, WebhookRequest};
