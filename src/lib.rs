@@ -107,6 +107,7 @@ pub mod http_utils;
 
 /// Unified payment provider interface
 pub mod payment_provider;
+pub mod provider_factory;
 
 /// PayPal API Implementation
 pub mod paypal;

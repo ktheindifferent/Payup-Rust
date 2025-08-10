@@ -4,11 +4,13 @@ pub mod orders;
 pub mod payments;
 pub mod subscriptions;
 pub mod webhooks;
+pub mod provider;
 
 use serde::{Deserialize, Serialize};
 
 pub use auth::PayPalAuth;
 pub use client::PayPalClient;
+pub use provider::PayPalProvider;
 
 // PayPal API endpoints
 pub const PAYPAL_SANDBOX_URL: &str = "https://api.sandbox.paypal.com";
