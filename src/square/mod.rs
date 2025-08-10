@@ -3,11 +3,16 @@ pub mod client;
 pub mod payments;
 pub mod customers;
 pub mod catalog;
+pub mod webhooks;
 
 use serde::{Deserialize, Serialize};
 
 pub use auth::SquareAuth;
 pub use client::SquareClient;
+pub use webhooks::{
+    SquareWebhookHandler, WebhookEvent, WebhookEventType, 
+    WebhookEventHandler, WebhookEventData, WebhookNotification
+};
 
 // Square API endpoints
 pub const SQUARE_SANDBOX_URL: &str = "https://connect.squareupsandbox.com";
