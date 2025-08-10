@@ -3,6 +3,7 @@ use reqwest::Client as AsyncHttpClient;
 use serde::{Deserialize, Serialize};
 use crate::error::{PayupError, Result};
 use crate::http_utils::{HttpRequestBuilder, build_url};
+use crate::rate_limiter::get_rate_limiter;
 use super::{PayPalConfig, PayPalAuth};
 
 pub struct PayPalClient {
@@ -93,16 +94,25 @@ impl PayPalClient {
         self.async_ensure_auth().await?;
         let url = build_url(self.config.environment.base_url(), endpoint);
         let auth_header = self.get_auth_header()?;
+        let rate_limiter = get_rate_limiter();
+        let request_builder = self.request_builder.clone();
         
-        let response = self.async_http_client
-            .get(&url)
-            .header("Authorization", auth_header)
-            .header("Content-Type", "application/json")
-            .send()
-            .await
-            .map_err(PayupError::from)?;
+        rate_limiter.execute_with_retry_async("paypal", move || {
+            let url = url.clone();
+            let auth_header = auth_header.clone();
+            let request_builder = request_builder.clone();
+            async move {
+                let response = AsyncHttpClient::new()
+                    .get(&url)
+                    .header("Authorization", auth_header)
+                    .header("Content-Type", "application/json")
+                    .send()
+                    .await
+                    .map_err(PayupError::from)?;
 
-        self.request_builder.process_async_response(response).await
+                request_builder.process_async_response(response).await
+            }
+        }).await
     }
 
     pub fn post<T, B>(&mut self, endpoint: &str, body: &B) -> Result<T>
@@ -133,17 +143,28 @@ impl PayPalClient {
         self.async_ensure_auth().await?;
         let url = build_url(self.config.environment.base_url(), endpoint);
         let auth_header = self.get_auth_header()?;
+        let rate_limiter = get_rate_limiter();
+        let request_builder = self.request_builder.clone();
+        let body_json = serde_json::to_value(body).map_err(PayupError::from)?;
         
-        let response = self.async_http_client
-            .post(&url)
-            .header("Authorization", auth_header)
-            .header("Content-Type", "application/json")
-            .json(body)
-            .send()
-            .await
-            .map_err(PayupError::from)?;
+        rate_limiter.execute_with_retry_async("paypal", move || {
+            let url = url.clone();
+            let auth_header = auth_header.clone();
+            let request_builder = request_builder.clone();
+            let body_json = body_json.clone();
+            async move {
+                let response = AsyncHttpClient::new()
+                    .post(&url)
+                    .header("Authorization", auth_header)
+                    .header("Content-Type", "application/json")
+                    .json(&body_json)
+                    .send()
+                    .await
+                    .map_err(PayupError::from)?;
 
-        self.request_builder.process_async_response(response).await
+                request_builder.process_async_response(response).await
+            }
+        }).await
     }
 
     pub fn patch<T, B>(&mut self, endpoint: &str, body: &B) -> Result<T>

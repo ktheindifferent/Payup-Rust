@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use crate::error::{PayupError, Result};
+use crate::circuit_breaker::get_circuit_breaker;
 
 /// Rate limiter for API calls with configurable limits per endpoint
 #[derive(Clone)]
@@ -154,7 +155,7 @@ impl RateLimiter {
         Duration::ZERO
     }
 
-    /// Execute a function with rate limiting and retry logic
+    /// Execute a function with rate limiting, circuit breaker, and retry logic
     pub async fn execute_with_retry<F, T>(
         &self,
         endpoint: &str,
@@ -163,6 +164,7 @@ impl RateLimiter {
     where
         F: Fn() -> Result<T> + Clone,
     {
+        let circuit_breaker = get_circuit_breaker();
         let limit = {
             let limits = self.limits.lock().unwrap();
             limits.get(endpoint)
@@ -174,13 +176,24 @@ impl RateLimiter {
         let mut backoff = limit.initial_backoff;
 
         loop {
+            // Check circuit breaker first
+            circuit_breaker.check_circuit(endpoint)?;
+            
             // Wait for rate limit if needed
             self.wait_if_needed(endpoint).await?;
 
             // Try to execute the function
             match f() {
-                Ok(result) => return Ok(result),
+                Ok(result) => {
+                    circuit_breaker.record_success(endpoint);
+                    return Ok(result);
+                },
                 Err(e) => {
+                    // Record failure in circuit breaker for certain error types
+                    if is_circuit_breaking_error(&e) {
+                        circuit_breaker.record_failure(endpoint);
+                    }
+                    
                     // Check if we should retry
                     if !limit.auto_retry || attempt >= limit.max_retries {
                         return Err(e);
@@ -203,7 +216,7 @@ impl RateLimiter {
         }
     }
 
-    /// Execute an async function with rate limiting and retry logic
+    /// Execute an async function with rate limiting, circuit breaker, and retry logic
     pub async fn execute_with_retry_async<F, T, Fut>(
         &self,
         endpoint: &str,
@@ -213,6 +226,7 @@ impl RateLimiter {
         F: Fn() -> Fut + Clone,
         Fut: std::future::Future<Output = Result<T>>,
     {
+        let circuit_breaker = get_circuit_breaker();
         let limit = {
             let limits = self.limits.lock().unwrap();
             limits.get(endpoint)
@@ -224,13 +238,24 @@ impl RateLimiter {
         let mut backoff = limit.initial_backoff;
 
         loop {
+            // Check circuit breaker first
+            circuit_breaker.check_circuit(endpoint)?;
+            
             // Wait for rate limit if needed
             self.wait_if_needed(endpoint).await?;
 
             // Try to execute the function
             match f().await {
-                Ok(result) => return Ok(result),
+                Ok(result) => {
+                    circuit_breaker.record_success(endpoint);
+                    return Ok(result);
+                },
                 Err(e) => {
+                    // Record failure in circuit breaker for certain error types
+                    if is_circuit_breaking_error(&e) {
+                        circuit_breaker.record_failure(endpoint);
+                    }
+                    
                     // Check if we should retry
                     if !limit.auto_retry || attempt >= limit.max_retries {
                         return Err(e);
@@ -275,6 +300,16 @@ fn is_retryable_error(error: &PayupError) -> bool {
     match error {
         PayupError::NetworkError(_) => true,
         PayupError::RateLimitExceeded(_) => true,
+        PayupError::ServerError(status) if *status >= 500 => true,
+        PayupError::TimeoutError(_) => true,
+        _ => false,
+    }
+}
+
+/// Check if an error should trigger circuit breaker
+fn is_circuit_breaking_error(error: &PayupError) -> bool {
+    match error {
+        PayupError::NetworkError(_) => true,
         PayupError::ServerError(status) if *status >= 500 => true,
         PayupError::TimeoutError(_) => true,
         _ => false,

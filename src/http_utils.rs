@@ -3,6 +3,7 @@ use reqwest::{RequestBuilder as AsyncRequestBuilder, Response as AsyncResponse};
 use serde::Deserialize;
 use crate::error::{PayupError, Result};
 
+#[derive(Clone)]
 pub struct HttpRequestBuilder {
     provider_name: String,
 }
