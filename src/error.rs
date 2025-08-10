@@ -56,6 +56,24 @@ pub enum PayupError {
     
     // Unsupported operation
     UnsupportedOperation(String),
+    
+    // Additional HTTP errors for better granularity
+    Http(String),
+    BadRequest(String),
+    Unauthorized(String),
+    Forbidden(String),
+    NotFound(String),
+    RateLimited(String),
+    
+    // Runtime errors
+    Runtime(String),
+    
+    // Validation errors with better context
+    Validation(String),
+    
+    // Serialization/Deserialization with context
+    Serialization(String),
+    Deserialization(String),
 }
 
 #[derive(Debug)]
@@ -106,6 +124,36 @@ impl fmt::Display for PayupError {
             
             PayupError::UnsupportedOperation(msg) => 
                 write!(f, "Unsupported operation: {}", msg),
+            
+            PayupError::Http(msg) => 
+                write!(f, "HTTP error: {}", msg),
+            
+            PayupError::BadRequest(msg) => 
+                write!(f, "Bad request: {}", msg),
+            
+            PayupError::Unauthorized(msg) => 
+                write!(f, "Unauthorized: {}", msg),
+            
+            PayupError::Forbidden(msg) => 
+                write!(f, "Forbidden: {}", msg),
+            
+            PayupError::NotFound(msg) => 
+                write!(f, "Not found: {}", msg),
+            
+            PayupError::RateLimited(msg) => 
+                write!(f, "Rate limited: {}", msg),
+            
+            PayupError::Runtime(msg) => 
+                write!(f, "Runtime error: {}", msg),
+            
+            PayupError::Validation(msg) => 
+                write!(f, "Validation error: {}", msg),
+            
+            PayupError::Serialization(msg) => 
+                write!(f, "Serialization error: {}", msg),
+            
+            PayupError::Deserialization(msg) => 
+                write!(f, "Deserialization error: {}", msg),
         }
     }
 }

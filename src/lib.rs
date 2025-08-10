@@ -123,3 +123,18 @@ pub mod crypto;
 
 /// Rate limiting and retry logic for API calls
 pub mod rate_limiter;
+
+/// Centralized HTTP client with connection pooling
+pub mod http_client;
+
+/// Configuration and constants
+pub mod config;
+
+/// Builder patterns and utilities
+pub mod builders;
+
+/// Async/sync code generation macros
+pub mod async_sync_macro;
+
+/// Safe utility functions for error handling
+pub mod safe_utils;
