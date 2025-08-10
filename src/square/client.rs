@@ -3,6 +3,7 @@ use reqwest::Client as AsyncHttpClient;
 use serde::{Deserialize, Serialize};
 use crate::error::{PayupError, Result};
 use crate::http_utils::{HttpRequestBuilder, build_url};
+use crate::rate_limiter::get_rate_limiter;
 use super::{SquareConfig, SquareAuth, ApiResponse};
 
 pub struct SquareClient {
@@ -91,15 +92,23 @@ impl SquareClient {
         T: for<'de> Deserialize<'de>,
     {
         let url = build_url(self.auth.base_url(), endpoint);
+        let auth_header = self.auth.authorization_header();
+        let rate_limiter = get_rate_limiter();
         
-        let response = self.async_http_client
-            .get(&url)
-            .header("Authorization", self.auth.authorization_header())
-            .header("Content-Type", "application/json")
-            .header("Square-Version", "2024-01-01")
-            .send()
-            .await
-            .map_err(PayupError::from)?;
+        let response = rate_limiter.execute_with_retry_async("square", move || {
+            let url = url.clone();
+            let auth_header = auth_header.clone();
+            async move {
+                AsyncHttpClient::new()
+                    .get(&url)
+                    .header("Authorization", auth_header)
+                    .header("Content-Type", "application/json")
+                    .header("Square-Version", "2024-01-01")
+                    .send()
+                    .await
+                    .map_err(PayupError::from)
+            }
+        }).await?;
 
         self.process_async_square_response(response).await
     }
@@ -151,16 +160,26 @@ impl SquareClient {
         B: Serialize,
     {
         let url = build_url(self.auth.base_url(), endpoint);
+        let auth_header = self.auth.authorization_header();
+        let rate_limiter = get_rate_limiter();
+        let body_json = serde_json::to_value(body).map_err(PayupError::from)?;
         
-        let response = self.async_http_client
-            .post(&url)
-            .header("Authorization", self.auth.authorization_header())
-            .header("Content-Type", "application/json")
-            .header("Square-Version", "2024-01-01")
-            .json(body)
-            .send()
-            .await
-            .map_err(PayupError::from)?;
+        let response = rate_limiter.execute_with_retry_async("square", move || {
+            let url = url.clone();
+            let auth_header = auth_header.clone();
+            let body_json = body_json.clone();
+            async move {
+                AsyncHttpClient::new()
+                    .post(&url)
+                    .header("Authorization", auth_header)
+                    .header("Content-Type", "application/json")
+                    .header("Square-Version", "2024-01-01")
+                    .json(&body_json)
+                    .send()
+                    .await
+                    .map_err(PayupError::from)
+            }
+        }).await?;
 
         self.process_async_square_response(response).await
     }

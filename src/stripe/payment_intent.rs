@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::error::Result;
+use crate::rate_limiter::get_rate_limiter;
 use super::Auth;
 
 /// Status of a payment intent
@@ -371,16 +372,23 @@ impl PaymentIntent {
 
     /// Create a new payment intent (async)
     pub async fn create_async(auth: &Auth, params: CreatePaymentIntentParams) -> Result<Self> {
-        let client = reqwest::Client::new();
-        let response = client
-            .post("https://api.stripe.com/v1/payment_intents")
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .form(&params)
-            .send()
-            .await?;
+        let rate_limiter = get_rate_limiter();
         
-        let payment_intent: PaymentIntent = response.json().await?;
-        Ok(payment_intent)
+        rate_limiter.execute_with_retry_async("stripe", move || {
+            let params = params.clone();
+            async move {
+                let client = reqwest::Client::new();
+                let response = client
+                    .post("https://api.stripe.com/v1/payment_intents")
+                    .header("Authorization", format!("Bearer {}", auth.secret))
+                    .form(&params)
+                    .send()
+                    .await?;
+                
+                let payment_intent: PaymentIntent = response.json().await?;
+                Ok(payment_intent)
+            }
+        }).await
     }
 
     /// Retrieve a payment intent by ID
@@ -405,15 +413,23 @@ impl PaymentIntent {
 
     /// Retrieve a payment intent by ID (async)
     pub async fn retrieve_async(auth: &Auth, payment_intent_id: &str) -> Result<Self> {
-        let client = reqwest::Client::new();
-        let response = client
-            .get(&format!("https://api.stripe.com/v1/payment_intents/{}", payment_intent_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .send()
-            .await?;
+        let rate_limiter = get_rate_limiter();
+        let payment_intent_id = payment_intent_id.to_string();
         
-        let payment_intent: PaymentIntent = response.json().await?;
-        Ok(payment_intent)
+        rate_limiter.execute_with_retry_async("stripe", move || {
+            let payment_intent_id = payment_intent_id.clone();
+            async move {
+                let client = reqwest::Client::new();
+                let response = client
+                    .get(&format!("https://api.stripe.com/v1/payment_intents/{}", payment_intent_id))
+                    .header("Authorization", format!("Bearer {}", auth.secret))
+                    .send()
+                    .await?;
+                
+                let payment_intent: PaymentIntent = response.json().await?;
+                Ok(payment_intent)
+            }
+        }).await
     }
 
     /// Update a payment intent
@@ -444,16 +460,25 @@ impl PaymentIntent {
 
     /// Update a payment intent (async)
     pub async fn update_async(auth: &Auth, payment_intent_id: &str, params: UpdatePaymentIntentParams) -> Result<Self> {
-        let client = reqwest::Client::new();
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/payment_intents/{}", payment_intent_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .form(&params)
-            .send()
-            .await?;
+        let rate_limiter = get_rate_limiter();
+        let payment_intent_id = payment_intent_id.to_string();
         
-        let payment_intent: PaymentIntent = response.json().await?;
-        Ok(payment_intent)
+        rate_limiter.execute_with_retry_async("stripe", move || {
+            let payment_intent_id = payment_intent_id.clone();
+            let params = params.clone();
+            async move {
+                let client = reqwest::Client::new();
+                let response = client
+                    .post(&format!("https://api.stripe.com/v1/payment_intents/{}", payment_intent_id))
+                    .header("Authorization", format!("Bearer {}", auth.secret))
+                    .form(&params)
+                    .send()
+                    .await?;
+                
+                let payment_intent: PaymentIntent = response.json().await?;
+                Ok(payment_intent)
+            }
+        }).await
     }
 
     /// Confirm a payment intent
@@ -486,16 +511,25 @@ impl PaymentIntent {
 
     /// Confirm a payment intent (async)
     pub async fn confirm_async(auth: &Auth, payment_intent_id: &str, params: ConfirmPaymentIntentParams) -> Result<Self> {
-        let client = reqwest::Client::new();
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/payment_intents/{}/confirm", payment_intent_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .form(&params)
-            .send()
-            .await?;
+        let rate_limiter = get_rate_limiter();
+        let payment_intent_id = payment_intent_id.to_string();
         
-        let payment_intent: PaymentIntent = response.json().await?;
-        Ok(payment_intent)
+        rate_limiter.execute_with_retry_async("stripe", move || {
+            let payment_intent_id = payment_intent_id.clone();
+            let params = params.clone();
+            async move {
+                let client = reqwest::Client::new();
+                let response = client
+                    .post(&format!("https://api.stripe.com/v1/payment_intents/{}/confirm", payment_intent_id))
+                    .header("Authorization", format!("Bearer {}", auth.secret))
+                    .form(&params)
+                    .send()
+                    .await?;
+                
+                let payment_intent: PaymentIntent = response.json().await?;
+                Ok(payment_intent)
+            }
+        }).await
     }
 
     /// Capture a payment intent
@@ -528,16 +562,25 @@ impl PaymentIntent {
 
     /// Capture a payment intent (async)
     pub async fn capture_async(auth: &Auth, payment_intent_id: &str, params: CapturePaymentIntentParams) -> Result<Self> {
-        let client = reqwest::Client::new();
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/payment_intents/{}/capture", payment_intent_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .form(&params)
-            .send()
-            .await?;
+        let rate_limiter = get_rate_limiter();
+        let payment_intent_id = payment_intent_id.to_string();
         
-        let payment_intent: PaymentIntent = response.json().await?;
-        Ok(payment_intent)
+        rate_limiter.execute_with_retry_async("stripe", move || {
+            let payment_intent_id = payment_intent_id.clone();
+            let params = params.clone();
+            async move {
+                let client = reqwest::Client::new();
+                let response = client
+                    .post(&format!("https://api.stripe.com/v1/payment_intents/{}/capture", payment_intent_id))
+                    .header("Authorization", format!("Bearer {}", auth.secret))
+                    .form(&params)
+                    .send()
+                    .await?;
+                
+                let payment_intent: PaymentIntent = response.json().await?;
+                Ok(payment_intent)
+            }
+        }).await
     }
 
     /// Cancel a payment intent
@@ -566,16 +609,25 @@ impl PaymentIntent {
 
     /// Cancel a payment intent (async)
     pub async fn cancel_async(auth: &Auth, payment_intent_id: &str, params: CancelPaymentIntentParams) -> Result<Self> {
-        let client = reqwest::Client::new();
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/payment_intents/{}/cancel", payment_intent_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .form(&params)
-            .send()
-            .await?;
+        let rate_limiter = get_rate_limiter();
+        let payment_intent_id = payment_intent_id.to_string();
         
-        let payment_intent: PaymentIntent = response.json().await?;
-        Ok(payment_intent)
+        rate_limiter.execute_with_retry_async("stripe", move || {
+            let payment_intent_id = payment_intent_id.clone();
+            let params = params.clone();
+            async move {
+                let client = reqwest::Client::new();
+                let response = client
+                    .post(&format!("https://api.stripe.com/v1/payment_intents/{}/cancel", payment_intent_id))
+                    .header("Authorization", format!("Bearer {}", auth.secret))
+                    .form(&params)
+                    .send()
+                    .await?;
+                
+                let payment_intent: PaymentIntent = response.json().await?;
+                Ok(payment_intent)
+            }
+        }).await
     }
 
     /// List all payment intents
@@ -610,25 +662,29 @@ impl PaymentIntent {
 
     /// List all payment intents (async)
     pub async fn list_async(auth: &Auth, limit: Option<u32>) -> Result<Vec<Self>> {
-        let client = reqwest::Client::new();
-        let mut url = "https://api.stripe.com/v1/payment_intents".to_string();
-        if let Some(limit) = limit {
-            url = format!("{}?limit={}", url, limit);
-        }
+        let rate_limiter = get_rate_limiter();
         
-        let response = client
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .send()
-            .await?;
-        
-        #[derive(Deserialize)]
-        struct PaymentIntentList {
-            data: Vec<PaymentIntent>,
-        }
-        
-        let list: PaymentIntentList = response.json().await?;
-        Ok(list.data)
+        rate_limiter.execute_with_retry_async("stripe", move || async move {
+            let client = reqwest::Client::new();
+            let mut url = "https://api.stripe.com/v1/payment_intents".to_string();
+            if let Some(limit) = limit {
+                url = format!("{}?limit={}", url, limit);
+            }
+            
+            let response = client
+                .get(&url)
+                .header("Authorization", format!("Bearer {}", auth.secret))
+                .send()
+                .await?;
+            
+            #[derive(Deserialize)]
+            struct PaymentIntentList {
+                data: Vec<PaymentIntent>,
+            }
+            
+            let list: PaymentIntentList = response.json().await?;
+            Ok(list.data)
+        }).await
     }
 }
 
