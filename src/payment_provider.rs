@@ -182,6 +182,10 @@ pub enum PaymentFeature {
     Cryptocurrency,
     BankTransfers,
     DigitalWallets,
+    Subscriptions,
+    CustomerManagement,
+    DisputeManagement,
+    Invoicing,
 }
 
 // Synchronous wrapper for providers that don't have async implementations

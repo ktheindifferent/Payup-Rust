@@ -19,12 +19,17 @@ pub struct Payment {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PaymentStatus {
+    Created,
+    Captured,
     Completed,
     Declined,
+    Denied,
     PartiallyRefunded,
     Pending,
     Refunded,
     Failed,
+    Canceled,
+    Voided,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +53,7 @@ pub struct Refund {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RefundStatus {
+    Canceled,
     Cancelled,
     Pending,
     Completed,
