@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::error::Result;
+use crate::rate_limiter::get_rate_limiter;
 use super::Auth;
 
 /// Represents a Stripe Transfer object for moving funds between Stripe accounts
@@ -119,16 +120,20 @@ impl Transfer {
 
     /// Create a new transfer (async)
     pub async fn create_async(auth: &Auth, params: CreateTransferParams) -> Result<Self> {
-        let client = reqwest::Client::new();
-        let response = client
-            .post("https://api.stripe.com/v1/transfers")
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .form(&params)
-            .send()
-            .await?;
+        let rate_limiter = get_rate_limiter();
         
-        let transfer: Transfer = response.json().await?;
-        Ok(transfer)
+        rate_limiter.execute_with_retry_async("stripe", || async {
+            let client = reqwest::Client::new();
+            let response = client
+                .post("https://api.stripe.com/v1/transfers")
+                .header("Authorization", format!("Bearer {}", auth.secret))
+                .form(&params)
+                .send()
+                .await?;
+            
+            let transfer: Transfer = response.json().await?;
+            Ok(transfer)
+        }).await
     }
 
     /// Retrieve a transfer by ID
@@ -145,15 +150,23 @@ impl Transfer {
 
     /// Retrieve a transfer by ID (async)
     pub async fn retrieve_async(auth: &Auth, transfer_id: &str) -> Result<Self> {
-        let client = reqwest::Client::new();
-        let response = client
-            .get(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .send()
-            .await?;
+        let rate_limiter = get_rate_limiter();
+        let transfer_id = transfer_id.to_string();
         
-        let transfer: Transfer = response.json().await?;
-        Ok(transfer)
+        rate_limiter.execute_with_retry_async("stripe", move || {
+            let transfer_id = transfer_id.clone();
+            async move {
+                let client = reqwest::Client::new();
+                let response = client
+                    .get(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
+                    .header("Authorization", format!("Bearer {}", auth.secret))
+                    .send()
+                    .await?;
+                
+                let transfer: Transfer = response.json().await?;
+                Ok(transfer)
+            }
+        }).await
     }
 
     /// Update a transfer
@@ -171,16 +184,25 @@ impl Transfer {
 
     /// Update a transfer (async)
     pub async fn update_async(auth: &Auth, transfer_id: &str, params: UpdateTransferParams) -> Result<Self> {
-        let client = reqwest::Client::new();
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .form(&params)
-            .send()
-            .await?;
+        let rate_limiter = get_rate_limiter();
+        let transfer_id = transfer_id.to_string();
         
-        let transfer: Transfer = response.json().await?;
-        Ok(transfer)
+        rate_limiter.execute_with_retry_async("stripe", move || {
+            let transfer_id = transfer_id.clone();
+            let params = params.clone();
+            async move {
+                let client = reqwest::Client::new();
+                let response = client
+                    .post(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
+                    .header("Authorization", format!("Bearer {}", auth.secret))
+                    .form(&params)
+                    .send()
+                    .await?;
+                
+                let transfer: Transfer = response.json().await?;
+                Ok(transfer)
+            }
+        }).await
     }
 
     /// List all transfers
@@ -207,25 +229,29 @@ impl Transfer {
 
     /// List all transfers (async)
     pub async fn list_async(auth: &Auth, limit: Option<u32>) -> Result<Vec<Self>> {
-        let client = reqwest::Client::new();
-        let mut url = "https://api.stripe.com/v1/transfers".to_string();
-        if let Some(limit) = limit {
-            url = format!("{}?limit={}", url, limit);
-        }
+        let rate_limiter = get_rate_limiter();
         
-        let response = client
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .send()
-            .await?;
-        
-        #[derive(Deserialize)]
-        struct TransferList {
-            data: Vec<Transfer>,
-        }
-        
-        let list: TransferList = response.json().await?;
-        Ok(list.data)
+        rate_limiter.execute_with_retry_async("stripe", move || async move {
+            let client = reqwest::Client::new();
+            let mut url = "https://api.stripe.com/v1/transfers".to_string();
+            if let Some(limit) = limit {
+                url = format!("{}?limit={}", url, limit);
+            }
+            
+            let response = client
+                .get(&url)
+                .header("Authorization", format!("Bearer {}", auth.secret))
+                .send()
+                .await?;
+            
+            #[derive(Deserialize)]
+            struct TransferList {
+                data: Vec<Transfer>,
+            }
+            
+            let list: TransferList = response.json().await?;
+            Ok(list.data)
+        }).await
     }
 
     /// Create a transfer reversal
@@ -243,16 +269,25 @@ impl Transfer {
 
     /// Create a transfer reversal (async)
     pub async fn create_reversal_async(auth: &Auth, transfer_id: &str, params: CreateReversalParams) -> Result<TransferReversal> {
-        let client = reqwest::Client::new();
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .form(&params)
-            .send()
-            .await?;
+        let rate_limiter = get_rate_limiter();
+        let transfer_id = transfer_id.to_string();
         
-        let reversal: TransferReversal = response.json().await?;
-        Ok(reversal)
+        rate_limiter.execute_with_retry_async("stripe", move || {
+            let transfer_id = transfer_id.clone();
+            let params = params.clone();
+            async move {
+                let client = reqwest::Client::new();
+                let response = client
+                    .post(&format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id))
+                    .header("Authorization", format!("Bearer {}", auth.secret))
+                    .form(&params)
+                    .send()
+                    .await?;
+                
+                let reversal: TransferReversal = response.json().await?;
+                Ok(reversal)
+            }
+        }).await
     }
 
     /// Retrieve a transfer reversal
@@ -269,15 +304,25 @@ impl Transfer {
 
     /// Retrieve a transfer reversal (async)
     pub async fn retrieve_reversal_async(auth: &Auth, transfer_id: &str, reversal_id: &str) -> Result<TransferReversal> {
-        let client = reqwest::Client::new();
-        let response = client
-            .get(&format!("https://api.stripe.com/v1/transfers/{}/reversals/{}", transfer_id, reversal_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .send()
-            .await?;
+        let rate_limiter = get_rate_limiter();
+        let transfer_id = transfer_id.to_string();
+        let reversal_id = reversal_id.to_string();
         
-        let reversal: TransferReversal = response.json().await?;
-        Ok(reversal)
+        rate_limiter.execute_with_retry_async("stripe", move || {
+            let transfer_id = transfer_id.clone();
+            let reversal_id = reversal_id.clone();
+            async move {
+                let client = reqwest::Client::new();
+                let response = client
+                    .get(&format!("https://api.stripe.com/v1/transfers/{}/reversals/{}", transfer_id, reversal_id))
+                    .header("Authorization", format!("Bearer {}", auth.secret))
+                    .send()
+                    .await?;
+                
+                let reversal: TransferReversal = response.json().await?;
+                Ok(reversal)
+            }
+        }).await
     }
 
     /// List all reversals for a transfer
@@ -304,24 +349,32 @@ impl Transfer {
 
     /// List all reversals for a transfer (async)
     pub async fn list_reversals_async(auth: &Auth, transfer_id: &str, limit: Option<u32>) -> Result<Vec<TransferReversal>> {
-        let client = reqwest::Client::new();
-        let mut url = format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id);
-        if let Some(limit) = limit {
-            url = format!("{}?limit={}", url, limit);
-        }
+        let rate_limiter = get_rate_limiter();
+        let transfer_id = transfer_id.to_string();
         
-        let response = client
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .send()
-            .await?;
-        
-        #[derive(Deserialize)]
-        struct ReversalList {
-            data: Vec<TransferReversal>,
-        }
-        
-        let list: ReversalList = response.json().await?;
-        Ok(list.data)
+        rate_limiter.execute_with_retry_async("stripe", move || {
+            let transfer_id = transfer_id.clone();
+            async move {
+                let client = reqwest::Client::new();
+                let mut url = format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id);
+                if let Some(limit) = limit {
+                    url = format!("{}?limit={}", url, limit);
+                }
+                
+                let response = client
+                    .get(&url)
+                    .header("Authorization", format!("Bearer {}", auth.secret))
+                    .send()
+                    .await?;
+                
+                #[derive(Deserialize)]
+                struct ReversalList {
+                    data: Vec<TransferReversal>,
+                }
+                
+                let list: ReversalList = response.json().await?;
+                Ok(list.data)
+            }
+        }).await
     }
 }

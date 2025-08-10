@@ -125,6 +125,12 @@ pub mod crypto;
 /// Rate limiting and retry logic for API calls
 pub mod rate_limiter;
 
+/// Circuit breaker for fault tolerance
+pub mod circuit_breaker;
+
+/// Configuration for rate limiting and circuit breaking
+pub mod rate_limit_config;
+
 /// Centralized HTTP client with connection pooling
 pub mod http_client;
 
