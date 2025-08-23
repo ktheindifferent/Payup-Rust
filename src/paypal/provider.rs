@@ -323,7 +323,7 @@ impl PaymentProvider for PayPalProvider {
     async fn create_refund(&self, refund: &UnifiedRefund) -> Result<UnifiedRefund> {
         let mut client = self.client.lock().await;
         
-        let refund_request = payments::RefundRequest {
+        let refund_request = RefundRequest {
             amount: refund.amount.as_ref().map(|m| self.map_money(m)),
             invoice_id: None,
             note_to_payer: refund.reason.as_ref().and_then(|r| match r {
@@ -459,15 +459,17 @@ impl PaymentProvider for PayPalProvider {
         ))
     }
 
-    async fn verify_webhook(&self, payload: &[u8], signature: &str, secret: &str) -> Result<bool> {
-        use super::webhooks::PayPalWebhookHandler;
-        
-        let handler = PayPalWebhookHandler::new(secret.to_string());
-        Ok(handler.verify_signature(
-            std::str::from_utf8(payload).map_err(|e| 
-                PayupError::ValidationError(format!("Invalid UTF-8 in webhook payload: {}", e))
-            )?,
-            signature
-        ))
+    async fn verify_webhook(&self, _payload: &[u8], _signature: &str, _secret: &str) -> Result<bool> {
+        // TODO: Implement webhook verification once PayPalWebhookHandler is available
+        // use super::webhooks::PayPalWebhookHandler;
+        // 
+        // let handler = PayPalWebhookHandler::new(secret.to_string());
+        // Ok(handler.verify_signature(
+        //     std::str::from_utf8(payload).map_err(|e| 
+        //         PayupError::ValidationError(format!("Invalid UTF-8 in webhook payload: {}", e))
+        //     )?,
+        //     signature
+        // ))
+        Ok(false)
     }
 }

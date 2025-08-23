@@ -26,7 +26,11 @@ pub use payment_intent::{
     CapturePaymentIntentParams, CancelPaymentIntentParams, AutomaticPaymentMethods,
     ShippingDetails, Address as PaymentIntentAddress, PaymentMethodOptions, TransferData
 };
-pub use payment_method::PaymentMethod;
+pub use payment_method::{
+    PaymentMethod, PaymentMethodType as StripePaymentMethodType, 
+    CreatePaymentMethodParams, CreateCardParams, BillingDetails as PaymentMethodBillingDetails,
+    CardDetails as StripeCardDetails, Address as PaymentMethodAddress
+};
 pub use plan::{Plan, Price};
 pub use subscription::Subscription;
 pub use transfer::{Transfer, TransferReversal, TransferReversalList, CreateTransferParams, UpdateTransferParams, CreateReversalParams};
