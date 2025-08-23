@@ -1,5 +1,7 @@
 pub mod response;
 
+use crate::http_client::{get_shared_client, get_shared_blocking_client};
+
 // Full V1 API Support Complete
 /// Represents your Stripe balance.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -28,7 +30,7 @@ impl Balance {
     /// ```ignore
     pub async fn async_get(creds: Auth) -> Result<Self, reqwest::Error> {
         let url = "https://api.stripe.com/v1/balance";
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -54,7 +56,7 @@ impl Balance {
     /// ```ignore
     pub fn get(creds: Auth) -> Result<Self, reqwest::Error> {
         let url = "https://api.stripe.com/v1/balance";
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -108,7 +110,7 @@ impl BalanceTransaction {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/balance_transactions/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -166,7 +168,7 @@ impl BalanceTransaction {
     /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/balance_transactions/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -217,7 +219,7 @@ impl BalanceTransaction {
             None => "https://api.stripe.com/v1/balance_transactions".to_string(),
         };
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -237,7 +239,7 @@ impl BalanceTransaction {
             None => "https://api.stripe.com/v1/balance_transactions".to_string(),
         };
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -430,7 +432,7 @@ impl Charge {
             self.id.clone().unwrap()
         );
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_capture_params())
@@ -459,7 +461,7 @@ impl Charge {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/charges/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -519,7 +521,7 @@ impl Charge {
     /// charge = charge.async_post(auth.clone()).await?;
     /// ```ignore
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post("https://api.stripe.com/v1/charges")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -551,7 +553,7 @@ impl Charge {
     /// charge = charge.async_update(auth.clone()).await?;
     /// ```ignore
     pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post(format!(
                 "https://api.stripe.com/v1/charges/{}",
                 self.clone().id.unwrap()
@@ -597,7 +599,7 @@ impl Charge {
             self.id.clone().unwrap()
         );
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_capture_params())
@@ -625,7 +627,7 @@ impl Charge {
     /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/charges/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -684,7 +686,7 @@ impl Charge {
     /// charge = charge.post(auth.clone())?;
     /// ```ignore
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post("https://api.stripe.com/v1/charges")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -715,7 +717,7 @@ impl Charge {
     /// charge = charge.update(auth.clone()).await?;
     /// ```ignore
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post(format!(
                 "https://api.stripe.com/v1/charges/{}",
                 self.clone().id.unwrap()
@@ -738,7 +740,7 @@ impl Charge {
             );
         }
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -760,7 +762,7 @@ impl Charge {
             );
         }
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -929,7 +931,7 @@ impl Customer {
     pub async fn async_delete(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .delete(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -957,7 +959,7 @@ impl Customer {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -1103,7 +1105,7 @@ impl Customer {
     /// let customer = cust.async_post(auth).await?;
     /// ```ignore
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post("https://api.stripe.com/v1/customers")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -1149,7 +1151,7 @@ impl Customer {
     /// customer = cust.async_update(auth).await?;
     /// ```ignore
     pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post(format!(
                 "https://api.stripe.com/v1/customers/{}",
                 self.clone().id.unwrap()
@@ -1182,7 +1184,7 @@ impl Customer {
     pub fn delete(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .delete(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -1209,7 +1211,7 @@ impl Customer {
     /// ```ignore
     pub fn get(auth: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(auth.client.as_str(), Some(auth.secret.as_str()))
             .send()?;
@@ -1353,7 +1355,7 @@ impl Customer {
     /// let customer = cust.post(auth).unwrap();
     /// ```ignore
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post("https://api.stripe.com/v1/customers")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -1398,7 +1400,7 @@ impl Customer {
     /// customer = cust.update(auth)?;
     /// ```ignore
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post(format!(
                 "https://api.stripe.com/v1/customers/{}",
                 self.clone().id.unwrap()
@@ -1428,7 +1430,7 @@ impl Customer {
             )
         };
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -1450,7 +1452,7 @@ impl Customer {
             );
         }
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -1472,7 +1474,7 @@ impl Customer {
             );
         }
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -1500,7 +1502,7 @@ impl Customer {
             )
         };
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -1527,7 +1529,7 @@ impl Customer {
             )
         };
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -1634,7 +1636,7 @@ impl Dispute {
     /// dispute = dispute.async_close(auth.clone()).await?;
     /// ```ignore
     pub async fn async_close(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post(format!(
                 "https://api.stripe.com/v1/disputes/{}/close",
                 self.clone().id.unwrap()
@@ -1665,7 +1667,7 @@ impl Dispute {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/disputes/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -1730,7 +1732,7 @@ impl Dispute {
     /// dispute = dispute.async_update(auth.clone()).await?;
     /// ```ignore
     pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post(format!(
                 "https://api.stripe.com/v1/disputes/{}",
                 self.clone().id.unwrap()
@@ -1758,7 +1760,7 @@ impl Dispute {
     /// dispute = dispute.async_close(auth.clone())?;
     /// ```ignore
     pub fn close(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post(format!(
                 "https://api.stripe.com/v1/disputes/{}/close",
                 self.clone().id.unwrap()
@@ -1788,7 +1790,7 @@ impl Dispute {
     /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/disputes/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -1852,7 +1854,7 @@ impl Dispute {
     /// dispute = dispute.async_update(auth.clone())?;
     /// ```ignore
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post(format!(
                 "https://api.stripe.com/v1/disputes/{}",
                 self.clone().id.unwrap()
@@ -1875,7 +1877,7 @@ impl Dispute {
             );
         }
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -1897,7 +1899,7 @@ impl Dispute {
             );
         }
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -2205,7 +2207,7 @@ impl Event {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/events/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -2265,7 +2267,7 @@ impl Event {
     /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/events/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -2316,7 +2318,7 @@ impl Event {
             );
         }
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -2338,7 +2340,7 @@ impl Event {
             );
         }
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -2411,7 +2413,7 @@ impl File {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/files/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -2474,7 +2476,7 @@ impl File {
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let form = self.to_multipart_form_async().await;
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post("https://api.stripe.com/v1/files")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .multipart(form)
@@ -2506,7 +2508,7 @@ impl File {
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let form = self.to_multipart_form();
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post("https://api.stripe.com/v1/files")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .multipart(form)
@@ -2534,7 +2536,7 @@ impl File {
     /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/files/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -2585,7 +2587,7 @@ impl File {
             );
         }
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -2607,7 +2609,7 @@ impl File {
             );
         }
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -2716,7 +2718,7 @@ impl FileLink {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/file_links/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -2772,7 +2774,7 @@ impl FileLink {
     /// file_link = file_link.async_post(auth.clone()).await?;
     /// ```ignore
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post("https://api.stripe.com/v1/file_links")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -2799,7 +2801,7 @@ impl FileLink {
     /// file_link = file_link.async_update(auth.clone()).await?;
     /// ```ignore
     pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post(format!(
                 "https://api.stripe.com/v1/file_links/{}",
                 self.clone().id.unwrap()
@@ -2831,7 +2833,7 @@ impl FileLink {
     /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/file_links/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -2886,7 +2888,7 @@ impl FileLink {
     /// file_link = file_link.async_post(auth.clone())?;
     /// ```ignore
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post("https://api.stripe.com/v1/file_links")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -2912,7 +2914,7 @@ impl FileLink {
     /// file_link = file_link.update(auth.clone())?;
     /// ```ignore
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post(format!(
                 "https://api.stripe.com/v1/file_links/{}",
                 self.clone().id.unwrap()
@@ -2938,7 +2940,7 @@ impl FileLink {
             );
         }
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -2960,7 +2962,7 @@ impl FileLink {
             );
         }
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -3183,7 +3185,7 @@ impl Invoice {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/invoices/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -3249,7 +3251,7 @@ impl Invoice {
     /// invoice = invoice.async_post(auth).await?;
     /// ```ignore
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post("https://api.stripe.com/v1/invoices")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -3277,7 +3279,7 @@ impl Invoice {
     /// invoice = invoice.async_update(auth).await?;
     /// ```ignore
     pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post(format!(
                 "https://api.stripe.com/v1/invoices/{}",
                 self.clone().id.unwrap()
@@ -3309,7 +3311,7 @@ impl Invoice {
     /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/invoices/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -3373,7 +3375,7 @@ impl Invoice {
     /// invoice = invoice.post(auth)?;
     /// ```ignore
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post("https://api.stripe.com/v1/invoices")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -3400,7 +3402,7 @@ impl Invoice {
     /// invoice = invoice.update(auth)?;
     /// ```ignore
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post(format!(
                 "https://api.stripe.com/v1/invoices/{}",
                 self.clone().id.unwrap()
@@ -3444,7 +3446,7 @@ impl Invoice {
             }
         }
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -3484,7 +3486,7 @@ impl Invoice {
             }
         }
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -3565,7 +3567,7 @@ impl Mandate {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/file_links/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -3592,7 +3594,7 @@ impl Mandate {
     /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/file_links/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -3638,7 +3640,7 @@ impl PaymentMethod {
                     let url = format!("https://api.stripe.com/v1/payment_methods/{}/attach", id);
 
                     let params = [("customer", cust_id.as_str())];
-                    reqwest::blocking::Client::new()
+                    get_shared_blocking_client()
                         .post(url)
                         .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
                         .form(&params)
@@ -3656,7 +3658,7 @@ impl PaymentMethod {
     ) -> Result<crate::stripe::response::PaymentMethod, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/payment_methods/{}", id);
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send();
@@ -3671,7 +3673,7 @@ impl PaymentMethod {
         }
     }
     pub fn post(&self, creds: Auth) -> Result<PaymentMethod, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post("https://api.stripe.com/v1/payment_methods")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -3756,7 +3758,7 @@ impl Plan {
     ) -> Result<crate::stripe::response::Plan, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/plans/{}", id);
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .delete(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -3771,7 +3773,7 @@ impl Plan {
         id: String,
     ) -> Result<crate::stripe::response::Plan, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/plans/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(auth.client.as_str(), Some(auth.secret.as_str()))
             .send()
@@ -3803,7 +3805,7 @@ impl Plan {
         &self,
         creds: Auth,
     ) -> Result<crate::stripe::response::Plan, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post("https://api.stripe.com/v1/plans")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -3820,7 +3822,7 @@ impl Plan {
     ) -> Result<crate::stripe::response::Plan, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/plans/{}", id);
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .delete(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -3831,7 +3833,7 @@ impl Plan {
 
     pub fn get(auth: Auth, id: String) -> Result<crate::stripe::response::Plan, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/plans/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(auth.client.as_str(), Some(auth.secret.as_str()))
             .send()?;
@@ -3857,7 +3859,7 @@ impl Plan {
     }
 
     pub fn post(&self, creds: Auth) -> Result<crate::stripe::response::Plan, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post("https://api.stripe.com/v1/plans")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -3880,7 +3882,7 @@ impl Plan {
             );
         }
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -3902,7 +3904,7 @@ impl Plan {
             );
         }
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -3972,7 +3974,7 @@ impl Price {
         };
     }
     pub fn post(&self, creds: Auth) -> Result<Price, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post("https://api.stripe.com/v1/prices")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -4060,7 +4062,7 @@ impl Subscription {
     ) -> Result<crate::stripe::response::Subscription, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/subscriptions/{}", id);
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .delete(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send();
@@ -4098,7 +4100,7 @@ impl Subscription {
     ) -> Result<crate::stripe::response::Subscription, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/subscriptions/{}", id);
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send();
@@ -4114,7 +4116,7 @@ impl Subscription {
         &self,
         creds: Auth,
     ) -> Result<crate::stripe::response::Subscription, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post(format!(
                 "https://api.stripe.com/v1/subscriptions/{}",
                 self.clone().id.unwrap()
@@ -4132,7 +4134,7 @@ impl Subscription {
         }
     }
     pub fn post(&self, creds: Auth) -> Result<Subscription, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post("https://api.stripe.com/v1/subscriptions")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())

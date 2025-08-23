@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::stripe::Auth;
+use crate::http_client::{get_shared_client, get_shared_blocking_client};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Refund {
@@ -79,7 +80,7 @@ impl Refund {
     /// let created_refund = refund.post(auth)?;
     /// ```
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let mut params = std::collections::HashMap::new();
         
         if let Some(charge) = &self.charge {
@@ -113,7 +114,7 @@ impl Refund {
 
     /// Retrieve a refund
     pub fn get(creds: Auth, refund_id: String) -> Result<Self, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let url = format!("https://api.stripe.com/v1/refunds/{}", refund_id);
 
         let response = client
@@ -127,7 +128,7 @@ impl Refund {
     /// Update a refund
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         if let Some(id) = &self.id {
-            let client = reqwest::blocking::Client::new();
+            let client = get_shared_blocking_client();
             let url = format!("https://api.stripe.com/v1/refunds/{}", id);
             let mut params = std::collections::HashMap::new();
 
@@ -146,7 +147,7 @@ impl Refund {
             response.json()
         } else {
             // Return a mock error - in production, use proper error handling
-            let client = reqwest::blocking::Client::new();
+            let client = get_shared_blocking_client();
             let response = client.get("https://invalid.url").send()?;
             response.json()
         }
@@ -154,7 +155,7 @@ impl Refund {
 
     /// Cancel a refund
     pub fn cancel(creds: Auth, refund_id: String) -> Result<Self, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let url = format!("https://api.stripe.com/v1/refunds/{}/cancel", refund_id);
 
         let response = client
@@ -167,7 +168,7 @@ impl Refund {
 
     /// List all refunds
     pub fn list(creds: Auth, charge_id: Option<String>, limit: Option<i32>) -> Result<RefundList, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let mut url = String::from("https://api.stripe.com/v1/refunds?");
         
         if let Some(charge) = charge_id {
@@ -188,7 +189,7 @@ impl Refund {
 
     /// Async create a refund
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let mut params = std::collections::HashMap::new();
         
         if let Some(charge) = &self.charge {
@@ -219,7 +220,7 @@ impl Refund {
 
     /// Async retrieve a refund
     pub async fn async_get(creds: Auth, refund_id: String) -> Result<Self, reqwest::Error> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let url = format!("https://api.stripe.com/v1/refunds/{}", refund_id);
 
         let response = client
@@ -233,7 +234,7 @@ impl Refund {
 
     /// Async list all refunds
     pub async fn async_list(creds: Auth, charge_id: Option<String>, limit: Option<i32>) -> Result<RefundList, reqwest::Error> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let mut url = String::from("https://api.stripe.com/v1/refunds?");
         
         if let Some(charge) = charge_id {
