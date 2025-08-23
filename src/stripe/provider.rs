@@ -9,7 +9,9 @@ use crate::payment_provider::{
 };
 use super::{
     Auth, Customer, Customers, Charge, PaymentIntent, PaymentIntentStatus,
-    PaymentMethod, Subscription, CreatePaymentIntentParams, UpdatePaymentIntentParams,
+    PaymentMethod, StripePaymentMethodType, CreatePaymentMethodParams, CreateCardParams,
+    PaymentMethodBillingDetails, StripeCardDetails, PaymentMethodAddress,
+    Subscription, CreatePaymentIntentParams, UpdatePaymentIntentParams,
     ConfirmPaymentIntentParams, CapturePaymentIntentParams
 };
 use crate::stripe_ext::refund::Refund as StripeRefund;
@@ -24,14 +26,14 @@ pub struct StripeProvider {
 impl StripeProvider {
     pub fn new(api_key: String) -> Self {
         Self {
-            auth: Auth::new(api_key),
+            auth: Auth::new(api_key.clone(), api_key),
             client: Client::new(),
         }
     }
 
     pub fn with_client(api_key: String, client: Client) -> Self {
         Self {
-            auth: Auth::new(api_key),
+            auth: Auth::new(api_key.clone(), api_key),
             client,
         }
     }
@@ -68,12 +70,28 @@ impl StripeProvider {
     }
 
     fn map_payment_method_to_unified(&self, pm: &PaymentMethod) -> UnifiedPaymentMethod {
-        // TODO: Implement proper mapping when PaymentMethod struct is fully defined
+        let method_type = match &pm.payment_method_type {
+            Some(StripePaymentMethodType::Card) => PaymentMethodType::Card,
+            Some(StripePaymentMethodType::SepaDebit) => PaymentMethodType::BankAccount,
+            Some(StripePaymentMethodType::UsBankAccount) => PaymentMethodType::BankAccount,
+            Some(StripePaymentMethodType::Paypal) => PaymentMethodType::PayPal,
+            _ => PaymentMethodType::Other("stripe".to_string()),
+        };
+
+        let card = pm.card.as_ref().map(|c| CardDetails {
+            number: None, // Not returned by Stripe for security
+            exp_month: c.exp_month.map(|m| m.to_string()).unwrap_or_default(),
+            exp_year: c.exp_year.map(|y| y.to_string()).unwrap_or_default(),
+            cvv: None, // Not returned by Stripe for security
+            brand: c.brand.clone(),
+            last4: c.last4.clone(),
+        });
+
         UnifiedPaymentMethod {
             id: pm.id.clone(),
-            method_type: PaymentMethodType::Other("unknown".to_string()),
-            card: None,
-            bank_account: None,
+            method_type,
+            card,
+            bank_account: None, // Could be extended for SEPA/US Bank Account details
         }
     }
 
@@ -90,29 +108,28 @@ impl StripeProvider {
     }
 
     fn map_payment_intent_to_charge(&self, pi: &PaymentIntent) -> UnifiedCharge {
-        let status = match &pi.status {
-            Some(PaymentIntentStatus::RequiresPaymentMethod) => ChargeStatus::RequiresAction,
-            Some(PaymentIntentStatus::RequiresConfirmation) => ChargeStatus::RequiresAction,
-            Some(PaymentIntentStatus::RequiresAction) => ChargeStatus::RequiresAction,
-            Some(PaymentIntentStatus::Processing) => ChargeStatus::Processing,
-            Some(PaymentIntentStatus::RequiresCapture) => ChargeStatus::Processing,
-            Some(PaymentIntentStatus::Canceled) => ChargeStatus::Canceled,
-            Some(PaymentIntentStatus::Succeeded) => ChargeStatus::Succeeded,
-            None => ChargeStatus::Pending,
+        let status = match pi.status {
+            PaymentIntentStatus::RequiresPaymentMethod => ChargeStatus::RequiresAction,
+            PaymentIntentStatus::RequiresConfirmation => ChargeStatus::RequiresAction,
+            PaymentIntentStatus::RequiresAction => ChargeStatus::RequiresAction,
+            PaymentIntentStatus::Processing => ChargeStatus::Processing,
+            PaymentIntentStatus::RequiresCapture => ChargeStatus::Processing,
+            PaymentIntentStatus::Canceled => ChargeStatus::Canceled,
+            PaymentIntentStatus::Succeeded => ChargeStatus::Succeeded,
         };
 
         UnifiedCharge {
             id: pi.id.clone(),
             amount: Money {
-                amount: pi.amount.unwrap_or(0),
-                currency: pi.currency.clone().unwrap_or_else(|| "usd".to_string()),
+                amount: pi.amount,
+                currency: pi.currency.clone(),
             },
             customer_id: pi.customer.clone(),
             payment_method_id: pi.payment_method.clone(),
             status,
             description: pi.description.clone(),
             metadata: pi.metadata.clone(),
-            created_at: pi.created.map(|c| c as i64),
+            created_at: Some(pi.created),
         }
     }
 
@@ -188,16 +205,21 @@ impl StripeProvider {
         }
     }
 
-    fn map_subscription_to_unified(&self, sub: &Subscription) -> UnifiedSubscription {
+    fn map_subscription_to_unified(&self, sub: &crate::stripe::response::Subscription) -> UnifiedSubscription {
         let status = sub.status.as_ref()
             .map(|s| self.map_subscription_status(s))
             .unwrap_or(SubscriptionStatus::Incomplete);
+
+        // Extract price_id from items if available
+        let price_id = sub.items.as_ref()
+            .and_then(|items| items.data.first())
+            .map(|item| item.id.clone());
 
         UnifiedSubscription {
             id: sub.id.clone(),
             customer_id: sub.customer.clone().unwrap_or_default(),
             plan_id: None, // Stripe uses price_id instead
-            price_id: sub.plan.as_ref().and_then(|p| p.id.clone()),
+            price_id,
             status,
             current_period_start: sub.current_period_start,
             current_period_end: sub.current_period_end,
@@ -289,32 +311,60 @@ impl PaymentProvider for StripeProvider {
     }
 
     async fn create_payment_method(&self, payment_method: &UnifiedPaymentMethod) -> Result<UnifiedPaymentMethod> {
-        // TODO: Implement proper PaymentMethod creation using Stripe API
-        // For now, return a stub implementation
-        Err(PayupError::UnsupportedOperation(
-            "PaymentMethod creation not yet implemented for Stripe provider".to_string()
-        ))
+        // Map unified payment method to Stripe payment method type
+        let payment_method_type = match &payment_method.method_type {
+            PaymentMethodType::Card => StripePaymentMethodType::Card,
+            PaymentMethodType::BankAccount => StripePaymentMethodType::SepaDebit,
+            PaymentMethodType::PayPal => StripePaymentMethodType::Paypal,
+            PaymentMethodType::ApplePay => StripePaymentMethodType::Card, // Apple Pay uses card
+            PaymentMethodType::GooglePay => StripePaymentMethodType::Card, // Google Pay uses card
+            _ => return Err(PayupError::UnsupportedOperation(
+                format!("Payment method type {:?} not supported by Stripe", payment_method.method_type)
+            )),
+        };
+
+        // Build parameters based on payment method type
+        let mut params = CreatePaymentMethodParams {
+            payment_method_type,
+            billing_details: None,
+            card: None,
+            metadata: None,
+        };
+
+        // Add card details if it's a card payment method
+        if let Some(card) = &payment_method.card {
+            if let (Some(number), exp_month, exp_year) = (
+                card.number.as_ref(),
+                card.exp_month.parse::<i32>().ok(),
+                card.exp_year.parse::<i32>().ok(),
+            ) {
+                params.card = Some(CreateCardParams {
+                    number: number.clone(),
+                    exp_month: exp_month.unwrap_or(1),
+                    exp_year: exp_year.unwrap_or(2025),
+                    cvc: card.cvv.clone(),
+                });
+            }
+        }
+
+        // Create the payment method using Stripe API
+        let created = PaymentMethod::create_async(&self.auth, params).await?;
+        Ok(self.map_payment_method_to_unified(&created))
     }
 
-    async fn get_payment_method(&self, _payment_method_id: &str) -> Result<UnifiedPaymentMethod> {
-        // TODO: Implement proper PaymentMethod retrieval using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "PaymentMethod retrieval not yet implemented for Stripe provider".to_string()
-        ))
+    async fn get_payment_method(&self, payment_method_id: &str) -> Result<UnifiedPaymentMethod> {
+        let payment_method = PaymentMethod::retrieve_async(&self.auth, payment_method_id).await?;
+        Ok(self.map_payment_method_to_unified(&payment_method))
     }
 
-    async fn attach_payment_method(&self, _payment_method_id: &str, _customer_id: &str) -> Result<UnifiedPaymentMethod> {
-        // TODO: Implement proper PaymentMethod attachment using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "PaymentMethod attachment not yet implemented for Stripe provider".to_string()
-        ))
+    async fn attach_payment_method(&self, payment_method_id: &str, customer_id: &str) -> Result<UnifiedPaymentMethod> {
+        let attached = PaymentMethod::attach_async(&self.auth, payment_method_id, customer_id).await?;
+        Ok(self.map_payment_method_to_unified(&attached))
     }
 
-    async fn detach_payment_method(&self, _payment_method_id: &str) -> Result<UnifiedPaymentMethod> {
-        // TODO: Implement proper PaymentMethod detachment using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "PaymentMethod detachment not yet implemented for Stripe provider".to_string()
-        ))
+    async fn detach_payment_method(&self, payment_method_id: &str) -> Result<UnifiedPaymentMethod> {
+        let detached = PaymentMethod::detach_async(&self.auth, payment_method_id).await?;
+        Ok(self.map_payment_method_to_unified(&detached))
     }
 
     async fn create_charge(&self, charge: &UnifiedCharge) -> Result<UnifiedCharge> {
@@ -408,39 +458,110 @@ impl PaymentProvider for StripeProvider {
             .collect())
     }
 
-    async fn create_subscription(&self, _subscription: &UnifiedSubscription) -> Result<UnifiedSubscription> {
-        // TODO: Implement proper Subscription creation using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "Subscription creation not yet implemented for Stripe provider".to_string()
-        ))
+    async fn create_subscription(&self, subscription: &UnifiedSubscription) -> Result<UnifiedSubscription> {
+        let mut stripe_sub = Subscription::new();
+        stripe_sub.customer = Some(subscription.customer_id.clone());
+        
+        // Set price ID if provided
+        if let Some(price_id) = &subscription.price_id {
+            stripe_sub.price_items = Some(vec![price_id.clone()]);
+        } else if let Some(plan_id) = &subscription.plan_id {
+            // Support legacy plan_id as well
+            stripe_sub.price_items = Some(vec![plan_id.clone()]);
+        } else {
+            return Err(PayupError::ValidationError(
+                "Either price_id or plan_id must be provided for subscription".to_string()
+            ));
+        }
+        
+        // Set cancel_at_period_end if needed
+        stripe_sub.cancel_at_period_end = Some(subscription.cancel_at_period_end);
+        
+        let stripe_response = stripe_sub.async_post(self.auth.clone()).await
+            .map_err(|e| PayupError::ApiError {
+                code: "subscription_create_error".to_string(),
+                message: format!("Failed to create subscription: {}", e),
+                provider: "stripe".to_string(),
+            })?;
+        
+        Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
-    async fn get_subscription(&self, _subscription_id: &str) -> Result<UnifiedSubscription> {
-        // TODO: Implement proper Subscription retrieval using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "Subscription retrieval not yet implemented for Stripe provider".to_string()
-        ))
+    async fn get_subscription(&self, subscription_id: &str) -> Result<UnifiedSubscription> {
+        let stripe_response = Subscription::async_get(
+            self.auth.clone(),
+            subscription_id.to_string()
+        ).await
+            .map_err(|e| PayupError::ApiError {
+                code: "subscription_get_error".to_string(),
+                message: format!("Failed to get subscription: {}", e),
+                provider: "stripe".to_string(),
+            })?;
+        
+        Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
-    async fn update_subscription(&self, _subscription: &UnifiedSubscription) -> Result<UnifiedSubscription> {
-        // TODO: Implement proper Subscription update using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "Subscription update not yet implemented for Stripe provider".to_string()
-        ))
+    async fn update_subscription(&self, subscription: &UnifiedSubscription) -> Result<UnifiedSubscription> {
+        if subscription.id.is_none() {
+            return Err(PayupError::ValidationError(
+                "Subscription ID is required for update".to_string()
+            ));
+        }
+        
+        let mut stripe_sub = Subscription::new();
+        stripe_sub.id = subscription.id.clone();
+        
+        // Update price if provided
+        if let Some(price_id) = &subscription.price_id {
+            stripe_sub.price_items = Some(vec![price_id.clone()]);
+        } else if let Some(plan_id) = &subscription.plan_id {
+            stripe_sub.price_items = Some(vec![plan_id.clone()]);
+        }
+        
+        // Update cancel_at_period_end
+        stripe_sub.cancel_at_period_end = Some(subscription.cancel_at_period_end);
+        
+        let stripe_response = stripe_sub.async_update(self.auth.clone()).await
+            .map_err(|e| PayupError::ApiError {
+                code: "subscription_update_error".to_string(),
+                message: format!("Failed to update subscription: {}", e),
+                provider: "stripe".to_string(),
+            })?;
+        
+        Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
-    async fn cancel_subscription(&self, _subscription_id: &str, _at_period_end: bool) -> Result<UnifiedSubscription> {
-        // TODO: Implement proper Subscription cancellation using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "Subscription cancellation not yet implemented for Stripe provider".to_string()
-        ))
+    async fn cancel_subscription(&self, subscription_id: &str, at_period_end: bool) -> Result<UnifiedSubscription> {
+        let stripe_response = Subscription::async_cancel(
+            self.auth.clone(),
+            subscription_id.to_string(),
+            at_period_end
+        ).await
+            .map_err(|e| PayupError::ApiError {
+                code: "subscription_cancel_error".to_string(),
+                message: format!("Failed to cancel subscription: {}", e),
+                provider: "stripe".to_string(),
+            })?;
+        
+        Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
-    async fn list_subscriptions(&self, _customer_id: Option<&str>, _limit: Option<u32>) -> Result<Vec<UnifiedSubscription>> {
-        // TODO: Implement proper Subscription listing using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "Subscription listing not yet implemented for Stripe provider".to_string()
-        ))
+    async fn list_subscriptions(&self, customer_id: Option<&str>, limit: Option<u32>) -> Result<Vec<UnifiedSubscription>> {
+        let stripe_response = Subscription::async_list(
+            self.auth.clone(),
+            customer_id.map(String::from),
+            limit.map(|l| l as i32)
+        ).await
+            .map_err(|e| PayupError::ApiError {
+                code: "subscription_list_error".to_string(),
+                message: format!("Failed to list subscriptions: {}", e),
+                provider: "stripe".to_string(),
+            })?;
+        
+        Ok(stripe_response.data
+            .iter()
+            .map(|s| self.map_subscription_to_unified(s))
+            .collect())
     }
 
     async fn verify_webhook(&self, payload: &[u8], signature: &str, secret: &str) -> Result<bool> {

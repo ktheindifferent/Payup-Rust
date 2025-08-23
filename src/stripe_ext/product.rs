@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::stripe::Auth;
+use crate::http_client::{get_shared_client, get_shared_blocking_client};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Product {
@@ -67,7 +68,7 @@ impl Product {
     /// let created_product = product.post(auth)?;
     /// ```
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let mut params = std::collections::HashMap::new();
         
         params.insert("name", self.name.clone());
@@ -95,7 +96,7 @@ impl Product {
 
     /// Retrieve a product
     pub fn get(creds: Auth, product_id: String) -> Result<Self, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let url = format!("https://api.stripe.com/v1/products/{}", product_id);
 
         let response = client
@@ -109,7 +110,7 @@ impl Product {
     /// Update a product
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         if let Some(id) = &self.id {
-            let client = reqwest::blocking::Client::new();
+            let client = get_shared_blocking_client();
             let url = format!("https://api.stripe.com/v1/products/{}", id);
             let mut params = std::collections::HashMap::new();
 
@@ -132,7 +133,7 @@ impl Product {
             response.json()
         } else {
             // Return a mock error - in production, use proper error handling
-            let client = reqwest::blocking::Client::new();
+            let client = get_shared_blocking_client();
             let response = client.get("https://invalid.url").send()?;
             response.json()
         }
@@ -140,7 +141,7 @@ impl Product {
 
     /// List all products
     pub fn list(creds: Auth, limit: Option<i32>) -> Result<ProductList, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let mut url = String::from("https://api.stripe.com/v1/products");
         
         if let Some(lim) = limit {
@@ -157,7 +158,7 @@ impl Product {
 
     /// Delete a product
     pub fn delete(creds: Auth, product_id: String) -> Result<DeletedProduct, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let url = format!("https://api.stripe.com/v1/products/{}", product_id);
 
         let response = client
@@ -170,7 +171,7 @@ impl Product {
 
     /// Async create a new product
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let mut params = std::collections::HashMap::new();
         
         params.insert("name", self.name.clone());
@@ -195,7 +196,7 @@ impl Product {
 
     /// Async retrieve a product
     pub async fn async_get(creds: Auth, product_id: String) -> Result<Self, reqwest::Error> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let url = format!("https://api.stripe.com/v1/products/{}", product_id);
 
         let response = client
@@ -209,7 +210,7 @@ impl Product {
 
     /// Async list all products
     pub async fn async_list(creds: Auth, limit: Option<i32>) -> Result<ProductList, reqwest::Error> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let mut url = String::from("https://api.stripe.com/v1/products");
         
         if let Some(lim) = limit {

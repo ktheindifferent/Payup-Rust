@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::error::Result;
 use crate::rate_limiter::get_rate_limiter;
+use crate::http_client::{get_shared_client, get_shared_blocking_client};
 use super::Auth;
 
 /// Status of a payment intent
@@ -359,7 +360,7 @@ impl PaymentIntent {
     /// let payment_intent = PaymentIntent::create(&auth, params)?;
     /// ```
     pub fn create(auth: &Auth, params: CreatePaymentIntentParams) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .post("https://api.stripe.com/v1/payment_intents")
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -377,7 +378,7 @@ impl PaymentIntent {
         rate_limiter.execute_with_retry_async("stripe", move || {
             let params = params.clone();
             async move {
-                let client = reqwest::Client::new();
+                let client = get_shared_client();
                 let response = client
                     .post("https://api.stripe.com/v1/payment_intents")
                     .header("Authorization", format!("Bearer {}", auth.secret))
@@ -401,7 +402,7 @@ impl PaymentIntent {
     /// let payment_intent = PaymentIntent::retrieve(&auth, "pi_1234567890")?;
     /// ```
     pub fn retrieve(auth: &Auth, payment_intent_id: &str) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .get(&format!("https://api.stripe.com/v1/payment_intents/{}", payment_intent_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -419,7 +420,7 @@ impl PaymentIntent {
         rate_limiter.execute_with_retry_async("stripe", move || {
             let payment_intent_id = payment_intent_id.clone();
             async move {
-                let client = reqwest::Client::new();
+                let client = get_shared_client();
                 let response = client
                     .get(&format!("https://api.stripe.com/v1/payment_intents/{}", payment_intent_id))
                     .header("Authorization", format!("Bearer {}", auth.secret))
@@ -447,7 +448,7 @@ impl PaymentIntent {
     /// let payment_intent = PaymentIntent::update(&auth, "pi_1234567890", params)?;
     /// ```
     pub fn update(auth: &Auth, payment_intent_id: &str, params: UpdatePaymentIntentParams) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .post(&format!("https://api.stripe.com/v1/payment_intents/{}", payment_intent_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -467,7 +468,7 @@ impl PaymentIntent {
             let payment_intent_id = payment_intent_id.clone();
             let params = params.clone();
             async move {
-                let client = reqwest::Client::new();
+                let client = get_shared_client();
                 let response = client
                     .post(&format!("https://api.stripe.com/v1/payment_intents/{}", payment_intent_id))
                     .header("Authorization", format!("Bearer {}", auth.secret))
@@ -498,7 +499,7 @@ impl PaymentIntent {
     /// let payment_intent = PaymentIntent::confirm(&auth, "pi_1234567890", params)?;
     /// ```
     pub fn confirm(auth: &Auth, payment_intent_id: &str, params: ConfirmPaymentIntentParams) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .post(&format!("https://api.stripe.com/v1/payment_intents/{}/confirm", payment_intent_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -518,7 +519,7 @@ impl PaymentIntent {
             let payment_intent_id = payment_intent_id.clone();
             let params = params.clone();
             async move {
-                let client = reqwest::Client::new();
+                let client = get_shared_client();
                 let response = client
                     .post(&format!("https://api.stripe.com/v1/payment_intents/{}/confirm", payment_intent_id))
                     .header("Authorization", format!("Bearer {}", auth.secret))
@@ -549,7 +550,7 @@ impl PaymentIntent {
     /// let payment_intent = PaymentIntent::capture(&auth, "pi_1234567890", params)?;
     /// ```
     pub fn capture(auth: &Auth, payment_intent_id: &str, params: CapturePaymentIntentParams) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .post(&format!("https://api.stripe.com/v1/payment_intents/{}/capture", payment_intent_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -569,7 +570,7 @@ impl PaymentIntent {
             let payment_intent_id = payment_intent_id.clone();
             let params = params.clone();
             async move {
-                let client = reqwest::Client::new();
+                let client = get_shared_client();
                 let response = client
                     .post(&format!("https://api.stripe.com/v1/payment_intents/{}/capture", payment_intent_id))
                     .header("Authorization", format!("Bearer {}", auth.secret))
@@ -596,7 +597,7 @@ impl PaymentIntent {
     /// let payment_intent = PaymentIntent::cancel(&auth, "pi_1234567890", params)?;
     /// ```
     pub fn cancel(auth: &Auth, payment_intent_id: &str, params: CancelPaymentIntentParams) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .post(&format!("https://api.stripe.com/v1/payment_intents/{}/cancel", payment_intent_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -616,7 +617,7 @@ impl PaymentIntent {
             let payment_intent_id = payment_intent_id.clone();
             let params = params.clone();
             async move {
-                let client = reqwest::Client::new();
+                let client = get_shared_client();
                 let response = client
                     .post(&format!("https://api.stripe.com/v1/payment_intents/{}/cancel", payment_intent_id))
                     .header("Authorization", format!("Bearer {}", auth.secret))
@@ -640,7 +641,7 @@ impl PaymentIntent {
     /// let payment_intents = PaymentIntent::list(&auth, Some(10))?; // Get up to 10 payment intents
     /// ```
     pub fn list(auth: &Auth, limit: Option<u32>) -> Result<Vec<Self>> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let mut url = "https://api.stripe.com/v1/payment_intents".to_string();
         if let Some(limit) = limit {
             url = format!("{}?limit={}", url, limit);
@@ -665,7 +666,7 @@ impl PaymentIntent {
         let rate_limiter = get_rate_limiter();
         
         rate_limiter.execute_with_retry_async("stripe", move || async move {
-            let client = reqwest::Client::new();
+            let client = get_shared_client();
             let mut url = "https://api.stripe.com/v1/payment_intents".to_string();
             if let Some(limit) = limit {
                 url = format!("{}?limit={}", url, limit);

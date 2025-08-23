@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use base64::{Engine as _, engine::general_purpose};
 use crate::error::{PayupError, Result};
+use crate::http_client::{get_shared_client, get_shared_blocking_client};
 use super::PayPalEnvironment;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,7 +36,7 @@ impl PayPalAuth {
         client_secret: String,
         environment: PayPalEnvironment,
     ) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let url = format!("{}/v1/oauth2/token", environment.base_url());
         
         // Create Basic auth header
@@ -69,7 +70,7 @@ impl PayPalAuth {
         client_secret: String,
         environment: PayPalEnvironment,
     ) -> Result<Self> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let url = format!("{}/v1/oauth2/token", environment.base_url());
         
         // Create Basic auth header

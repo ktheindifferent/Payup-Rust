@@ -1,6 +1,7 @@
 use payup::payment_provider::{PaymentProvider, Customer, Charge, ChargeStatus, Money};
 use payup::provider_factory::{ProviderFactory, ProviderConfig, ProviderBuilder};
 use std::sync::Arc;
+use std::env;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -9,10 +10,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let provider = match ProviderFactory::from_env() {
         Ok(p) => p,
         Err(_) => {
-            // Fallback to manual configuration
+            // Fallback to manual configuration with environment variables
+            // SECURITY WARNING: Never hardcode API keys in production code!
+            // Use environment variables or secure credential management systems.
+            let api_key = env::var("STRIPE_API_KEY")
+                .unwrap_or_else(|_| {
+                    eprintln!("WARNING: STRIPE_API_KEY not set. Using placeholder.");
+                    eprintln!("Please set STRIPE_API_KEY environment variable with your actual API key.");
+                    "sk_test_PLACEHOLDER_REPLACE_WITH_REAL_KEY".to_string()
+                });
+            
             ProviderFactory::create(ProviderConfig {
                 provider: "stripe".to_string(),
-                api_key: "sk_test_example".to_string(),
+                api_key,
                 client_secret: None,
                 sandbox: true,
             })?
@@ -22,10 +32,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Using payment provider: {}", provider.name());
     
     // Example 2: Create provider using builder pattern
+    // SECURITY WARNING: Always load credentials from environment variables!
+    let paypal_client_id = env::var("PAYPAL_CLIENT_ID")
+        .unwrap_or_else(|_| {
+            eprintln!("WARNING: PAYPAL_CLIENT_ID not set. Using placeholder.");
+            "PLACEHOLDER_CLIENT_ID".to_string()
+        });
+    let paypal_client_secret = env::var("PAYPAL_CLIENT_SECRET")
+        .unwrap_or_else(|_| {
+            eprintln!("WARNING: PAYPAL_CLIENT_SECRET not set. Using placeholder.");
+            "PLACEHOLDER_CLIENT_SECRET".to_string()
+        });
+    
     let provider_builder = ProviderBuilder::new()
         .provider("paypal")
-        .api_key("client_id_here")
-        .client_secret("client_secret_here")
+        .api_key(paypal_client_id)
+        .client_secret(paypal_client_secret)
         .sandbox(true)
         .build();
     
@@ -130,24 +152,52 @@ async fn switch_provider_example() -> Result<(), Box<dyn std::error::Error>> {
     for provider_name in providers {
         println!("\nSwitching to provider: {}", provider_name);
         
+        // SECURITY WARNING: Production code must use secure credential storage!
+        // Never commit real API keys to version control.
         let config = match provider_name {
-            "stripe" => ProviderConfig {
-                provider: provider_name.to_string(),
-                api_key: "sk_test_example".to_string(),
-                client_secret: None,
-                sandbox: true,
+            "stripe" => {
+                let api_key = env::var("STRIPE_API_KEY")
+                    .unwrap_or_else(|_| {
+                        eprintln!("WARNING: STRIPE_API_KEY not set for provider switching example.");
+                        "sk_test_PLACEHOLDER".to_string()
+                    });
+                ProviderConfig {
+                    provider: provider_name.to_string(),
+                    api_key,
+                    client_secret: None,
+                    sandbox: true,
+                }
             },
-            "paypal" => ProviderConfig {
-                provider: provider_name.to_string(),
-                api_key: "client_id".to_string(),
-                client_secret: Some("client_secret".to_string()),
-                sandbox: true,
+            "paypal" => {
+                let client_id = env::var("PAYPAL_CLIENT_ID")
+                    .unwrap_or_else(|_| {
+                        eprintln!("WARNING: PAYPAL_CLIENT_ID not set for provider switching example.");
+                        "PLACEHOLDER_CLIENT_ID".to_string()
+                    });
+                let client_secret = env::var("PAYPAL_CLIENT_SECRET")
+                    .unwrap_or_else(|_| {
+                        eprintln!("WARNING: PAYPAL_CLIENT_SECRET not set for provider switching example.");
+                        "PLACEHOLDER_SECRET".to_string()
+                    });
+                ProviderConfig {
+                    provider: provider_name.to_string(),
+                    api_key: client_id,
+                    client_secret: Some(client_secret),
+                    sandbox: true,
+                }
             },
-            "square" => ProviderConfig {
-                provider: provider_name.to_string(),
-                api_key: "access_token".to_string(),
-                client_secret: None,
-                sandbox: true,
+            "square" => {
+                let access_token = env::var("SQUARE_ACCESS_TOKEN")
+                    .unwrap_or_else(|_| {
+                        eprintln!("WARNING: SQUARE_ACCESS_TOKEN not set for provider switching example.");
+                        "PLACEHOLDER_ACCESS_TOKEN".to_string()
+                    });
+                ProviderConfig {
+                    provider: provider_name.to_string(),
+                    api_key: access_token,
+                    client_secret: None,
+                    sandbox: true,
+                }
             },
             _ => continue,
         };

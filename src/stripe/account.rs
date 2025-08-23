@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::error::Result;
+use crate::http_client::{get_shared_client, get_shared_blocking_client};
 use super::Auth;
 
 /// Represents a Stripe Account (Connect account)
@@ -349,7 +350,7 @@ impl Account {
     /// let account = Account::create(&auth, params)?;
     /// ```
     pub fn create(auth: &Auth, params: CreateAccountParams) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .post("https://api.stripe.com/v1/accounts")
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -362,7 +363,7 @@ impl Account {
 
     /// Create a new Connect account (async)
     pub async fn create_async(auth: &Auth, params: CreateAccountParams) -> Result<Self> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let response = client
             .post("https://api.stripe.com/v1/accounts")
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -376,7 +377,7 @@ impl Account {
 
     /// Retrieve an account by ID
     pub fn retrieve(auth: &Auth, account_id: &str) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .get(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -388,7 +389,7 @@ impl Account {
 
     /// Retrieve an account by ID (async)
     pub async fn retrieve_async(auth: &Auth, account_id: &str) -> Result<Self> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let response = client
             .get(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -401,7 +402,7 @@ impl Account {
 
     /// Update an account
     pub fn update(auth: &Auth, account_id: &str, params: serde_json::Value) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .post(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -414,7 +415,7 @@ impl Account {
 
     /// Update an account (async)
     pub async fn update_async(auth: &Auth, account_id: &str, params: serde_json::Value) -> Result<Self> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let response = client
             .post(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -428,7 +429,7 @@ impl Account {
 
     /// Delete an account
     pub fn delete(auth: &Auth, account_id: &str) -> Result<DeletedAccount> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .delete(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -440,7 +441,7 @@ impl Account {
 
     /// Delete an account (async)
     pub async fn delete_async(auth: &Auth, account_id: &str) -> Result<DeletedAccount> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let response = client
             .delete(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -453,7 +454,7 @@ impl Account {
 
     /// List all accounts
     pub fn list(auth: &Auth, limit: Option<u32>) -> Result<Vec<Self>> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let mut url = "https://api.stripe.com/v1/accounts".to_string();
         if let Some(limit) = limit {
             url = format!("{}?limit={}", url, limit);
@@ -475,7 +476,7 @@ impl Account {
 
     /// List all accounts (async)
     pub async fn list_async(auth: &Auth, limit: Option<u32>) -> Result<Vec<Self>> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let mut url = "https://api.stripe.com/v1/accounts".to_string();
         if let Some(limit) = limit {
             url = format!("{}?limit={}", url, limit);
@@ -498,7 +499,7 @@ impl Account {
 
     /// Reject an account
     pub fn reject(auth: &Auth, account_id: &str, reason: &str) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let params = serde_json::json!({
             "reason": reason
         });
@@ -515,7 +516,7 @@ impl Account {
 
     /// Reject an account (async)
     pub async fn reject_async(auth: &Auth, account_id: &str, reason: &str) -> Result<Self> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let params = serde_json::json!({
             "reason": reason
         });

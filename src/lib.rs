@@ -18,6 +18,12 @@
 //!
 //! I built this library due to a lack of synchronous payment libraries. Currently im only focused on features I need for another project.
 //!
+//! ## Security
+//!
+//! **IMPORTANT**: Never hardcode API keys or credentials in your source code!
+//! Always load them from environment variables or secure credential management systems.
+//! See [SECURITY.md](https://github.com/PixelCoda/Payup-Rust/blob/master/SECURITY.md) for security best practices.
+//!
 //! ## Current Stripe Features:
 //!
 //! * Balance:

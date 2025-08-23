@@ -1,13 +1,28 @@
 use payup::stripe::{StripeWebhookHandler, WebhookEventType};
+use std::env;
 
 fn main() {
     // Example of using the Stripe webhook handler
     
-    // Your webhook endpoint secret from the Stripe Dashboard
-    let webhook_secret = "whsec_test_secret_key_from_stripe_dashboard";
+    // SECURITY WARNING: Never hardcode webhook secrets in production code!
+    // Always load from environment variables or secure secret management systems.
+    // 
+    // To obtain your webhook endpoint secret:
+    // 1. Go to the Stripe Dashboard (https://dashboard.stripe.com)
+    // 2. Navigate to Developers > Webhooks
+    // 3. Click on your webhook endpoint
+    // 4. Reveal and copy the "Signing secret"
+    let webhook_secret = env::var("STRIPE_WEBHOOK_SECRET")
+        .unwrap_or_else(|_| {
+            eprintln!("⚠️  WARNING: STRIPE_WEBHOOK_SECRET not set!");
+            eprintln!("   Please set the STRIPE_WEBHOOK_SECRET environment variable.");
+            eprintln!("   Example: export STRIPE_WEBHOOK_SECRET=whsec_...");
+            eprintln!("   Using placeholder value for demonstration only.");
+            "whsec_PLACEHOLDER_REPLACE_WITH_REAL_SECRET".to_string()
+        });
     
     // Create the webhook handler
-    let webhook_handler = StripeWebhookHandler::new(webhook_secret.to_string());
+    let webhook_handler = StripeWebhookHandler::new(webhook_secret);
     
     // Example webhook payload (this would come from Stripe in a real scenario)
     let payload = r#"{

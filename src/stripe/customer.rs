@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::stripe::auth::Auth;
+use crate::http_client::{get_shared_client, get_shared_blocking_client};
 
 /// Represents a customer of your business.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -89,7 +90,7 @@ impl Customer {
     pub async fn async_delete(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .delete(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -117,7 +118,7 @@ impl Customer {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -263,7 +264,7 @@ impl Customer {
     /// let customer = cust.async_post(auth).await?;
     /// ```ignore
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post("https://api.stripe.com/v1/customers")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -308,8 +309,13 @@ impl Customer {
     /// // Update customer
     /// customer = cust.async_update(auth).await?;
     /// ```ignore
+<<<<<<< HEAD
     pub async fn async_update(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
         let request = reqwest::Client::new()
+=======
+    pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+        let request = get_shared_client()
+>>>>>>> origin/master
             .post(format!(
                 "https://api.stripe.com/v1/customers/{}",
                 self.clone().id.ok_or_else(|| crate::error::PayupError::ValidationError("Customer ID is required for update".to_string()))?
@@ -343,7 +349,7 @@ impl Customer {
             )
         };
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -365,7 +371,7 @@ impl Customer {
             );
         }
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -393,7 +399,7 @@ impl Customer {
             )
         };
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()

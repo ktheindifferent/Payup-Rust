@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::error::Result;
 use crate::rate_limiter::get_rate_limiter;
+use crate::http_client::{get_shared_client, get_shared_blocking_client};
 use super::Auth;
 
 /// Represents a Stripe Transfer object for moving funds between Stripe accounts
@@ -107,7 +108,7 @@ impl Transfer {
     /// let transfer = Transfer::create(&auth, params)?;
     /// ```
     pub fn create(auth: &Auth, params: CreateTransferParams) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .post("https://api.stripe.com/v1/transfers")
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -123,7 +124,7 @@ impl Transfer {
         let rate_limiter = get_rate_limiter();
         
         rate_limiter.execute_with_retry_async("stripe", || async {
-            let client = reqwest::Client::new();
+            let client = get_shared_client();
             let response = client
                 .post("https://api.stripe.com/v1/transfers")
                 .header("Authorization", format!("Bearer {}", auth.secret))
@@ -138,7 +139,7 @@ impl Transfer {
 
     /// Retrieve a transfer by ID
     pub fn retrieve(auth: &Auth, transfer_id: &str) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .get(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -156,7 +157,7 @@ impl Transfer {
         rate_limiter.execute_with_retry_async("stripe", move || {
             let transfer_id = transfer_id.clone();
             async move {
-                let client = reqwest::Client::new();
+                let client = get_shared_client();
                 let response = client
                     .get(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
                     .header("Authorization", format!("Bearer {}", auth.secret))
@@ -171,7 +172,7 @@ impl Transfer {
 
     /// Update a transfer
     pub fn update(auth: &Auth, transfer_id: &str, params: UpdateTransferParams) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .post(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -191,7 +192,7 @@ impl Transfer {
             let transfer_id = transfer_id.clone();
             let params = params.clone();
             async move {
-                let client = reqwest::Client::new();
+                let client = get_shared_client();
                 let response = client
                     .post(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
                     .header("Authorization", format!("Bearer {}", auth.secret))
@@ -207,7 +208,7 @@ impl Transfer {
 
     /// List all transfers
     pub fn list(auth: &Auth, limit: Option<u32>) -> Result<Vec<Self>> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let mut url = "https://api.stripe.com/v1/transfers".to_string();
         if let Some(limit) = limit {
             url = format!("{}?limit={}", url, limit);
@@ -232,7 +233,7 @@ impl Transfer {
         let rate_limiter = get_rate_limiter();
         
         rate_limiter.execute_with_retry_async("stripe", move || async move {
-            let client = reqwest::Client::new();
+            let client = get_shared_client();
             let mut url = "https://api.stripe.com/v1/transfers".to_string();
             if let Some(limit) = limit {
                 url = format!("{}?limit={}", url, limit);
@@ -256,7 +257,7 @@ impl Transfer {
 
     /// Create a transfer reversal
     pub fn create_reversal(auth: &Auth, transfer_id: &str, params: CreateReversalParams) -> Result<TransferReversal> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .post(&format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -276,7 +277,7 @@ impl Transfer {
             let transfer_id = transfer_id.clone();
             let params = params.clone();
             async move {
-                let client = reqwest::Client::new();
+                let client = get_shared_client();
                 let response = client
                     .post(&format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id))
                     .header("Authorization", format!("Bearer {}", auth.secret))
@@ -292,7 +293,7 @@ impl Transfer {
 
     /// Retrieve a transfer reversal
     pub fn retrieve_reversal(auth: &Auth, transfer_id: &str, reversal_id: &str) -> Result<TransferReversal> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
             .get(&format!("https://api.stripe.com/v1/transfers/{}/reversals/{}", transfer_id, reversal_id))
             .header("Authorization", format!("Bearer {}", auth.secret))
@@ -312,7 +313,7 @@ impl Transfer {
             let transfer_id = transfer_id.clone();
             let reversal_id = reversal_id.clone();
             async move {
-                let client = reqwest::Client::new();
+                let client = get_shared_client();
                 let response = client
                     .get(&format!("https://api.stripe.com/v1/transfers/{}/reversals/{}", transfer_id, reversal_id))
                     .header("Authorization", format!("Bearer {}", auth.secret))
@@ -327,7 +328,7 @@ impl Transfer {
 
     /// List all reversals for a transfer
     pub fn list_reversals(auth: &Auth, transfer_id: &str, limit: Option<u32>) -> Result<Vec<TransferReversal>> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let mut url = format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id);
         if let Some(limit) = limit {
             url = format!("{}?limit={}", url, limit);
@@ -355,7 +356,7 @@ impl Transfer {
         rate_limiter.execute_with_retry_async("stripe", move || {
             let transfer_id = transfer_id.clone();
             async move {
-                let client = reqwest::Client::new();
+                let client = get_shared_client();
                 let mut url = format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id);
                 if let Some(limit) = limit {
                     url = format!("{}?limit={}", url, limit);

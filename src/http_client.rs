@@ -5,23 +5,48 @@ use serde::{Deserialize, Serialize};
 use crate::error::PayupError;
 use once_cell::sync::Lazy;
 
+/// Global shared HTTP client with optimized connection pooling settings
+/// This client is thread-safe and can be cloned cheaply (Arc)
 pub static SHARED_CLIENT: Lazy<Arc<Client>> = Lazy::new(|| {
     Arc::new(
         Client::builder()
+            // Request timeout
             .timeout(Duration::from_secs(30))
+            // Connection pool settings
             .pool_idle_timeout(Duration::from_secs(90))
-            .pool_max_idle_per_host(10)
+            .pool_max_idle_per_host(20)  // Increased from 10 for better concurrency
+            // HTTP/2 settings for better multiplexing
+            .http2_initial_stream_window_size(2_097_152)  // 2MB
+            .http2_initial_connection_window_size(4_194_304)  // 4MB
+            .http2_adaptive_window(true)
+            // Connection settings
+            .tcp_keepalive(Duration::from_secs(60))
+            .tcp_nodelay(true)  // Disable Nagle's algorithm for lower latency
+            // Security settings
+            .danger_accept_invalid_certs(false)
+            .use_rustls_tls()
+            // Build the client
             .build()
             .expect("Failed to create HTTP client")
     )
 });
 
+/// Global shared blocking HTTP client with optimized connection pooling settings
 pub static SHARED_BLOCKING_CLIENT: Lazy<Arc<reqwest::blocking::Client>> = Lazy::new(|| {
     Arc::new(
         reqwest::blocking::Client::builder()
+            // Request timeout
             .timeout(Duration::from_secs(30))
+            // Connection pool settings
             .pool_idle_timeout(Duration::from_secs(90))
-            .pool_max_idle_per_host(10)
+            .pool_max_idle_per_host(20)  // Increased from 10 for better concurrency
+            // Connection settings
+            .tcp_keepalive(Duration::from_secs(60))
+            .tcp_nodelay(true)  // Disable Nagle's algorithm for lower latency
+            // Security settings
+            .danger_accept_invalid_certs(false)
+            .use_rustls_tls()
+            // Build the client
             .build()
             .expect("Failed to create blocking HTTP client")
     )
@@ -382,4 +407,15 @@ impl RequestBuilder {
             format!("{}?{}", self.endpoint, query)
         }
     }
+}
+
+/// Get a shared HTTP client instance with connection pooling
+/// This is a convenience function for direct client usage
+pub fn get_shared_client() -> Arc<Client> {
+    SHARED_CLIENT.clone()
+}
+
+/// Get a shared blocking HTTP client instance with connection pooling
+pub fn get_shared_blocking_client() -> Arc<reqwest::blocking::Client> {
+    SHARED_BLOCKING_CLIENT.clone()
 }

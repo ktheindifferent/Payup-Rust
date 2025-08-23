@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::stripe::auth::Auth;
+use crate::http_client::{get_shared_client, get_shared_blocking_client};
 
 // TODO - Finish Implementation
 /// You can store multiple cards on a customer in order to charge the customer later.
@@ -186,7 +187,7 @@ impl Charge {
             self.id.clone().ok_or_else(|| crate::error::PayupError::ValidationError("Charge ID is required for capture".to_string()))?
         );
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_capture_params())
@@ -215,7 +216,7 @@ impl Charge {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/charges/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -275,7 +276,7 @@ impl Charge {
     /// charge = charge.async_post(auth.clone()).await?;
     /// ```ignore
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post("https://api.stripe.com/v1/charges")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -306,8 +307,13 @@ impl Charge {
     /// charge.receipt_email = Some("testchanged@test.com".to_string());
     /// charge = charge.async_update(auth.clone()).await?;
     /// ```ignore
+<<<<<<< HEAD
     pub async fn async_update(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
         let request = reqwest::Client::new()
+=======
+    pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+        let request = get_shared_client()
+>>>>>>> origin/master
             .post(format!(
                 "https://api.stripe.com/v1/charges/{}",
                 self.clone().id.ok_or_else(|| crate::error::PayupError::ValidationError("Charge ID is required for update".to_string()))?
@@ -353,7 +359,7 @@ impl Charge {
             self.id.clone().unwrap()
         );
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_capture_params())
@@ -381,7 +387,7 @@ impl Charge {
     /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/charges/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -440,7 +446,7 @@ impl Charge {
     /// charge = charge.post(auth.clone())?;
     /// ```ignore
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .post("https://api.stripe.com/v1/charges")
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -470,8 +476,13 @@ impl Charge {
     /// charge.receipt_email = Some("testchanged@test.com".to_string());
     /// charge = charge.update(auth.clone()).await?;
     /// ```ignore
+<<<<<<< HEAD
     pub fn update(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
         let request = reqwest::blocking::Client::new()
+=======
+    pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+        let request = get_shared_blocking_client()
+>>>>>>> origin/master
             .post(format!(
                 "https://api.stripe.com/v1/charges/{}",
                 self.clone().id.ok_or_else(|| crate::error::PayupError::ValidationError("Charge ID is required for update".to_string()))?
@@ -494,7 +505,7 @@ impl Charge {
             );
         }
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -516,7 +527,7 @@ impl Charge {
             );
         }
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
