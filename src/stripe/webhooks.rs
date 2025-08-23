@@ -306,7 +306,8 @@ mod tests {
         let handler = StripeWebhookHandler::new("test_secret".to_string());
         let header = "t=1614556800 v1=5257a869e7ecb3f2e3c5a6d5e3b5a6d5e3b5a6d5e3b5a6d5e3b5a6d5e3b5a6d5";
         
-        let parsed = handler.parse_signature_header(header).unwrap();
+        let parsed = handler.parse_signature_header(header)
+            .expect("Failed to parse valid signature header");
         assert_eq!(parsed.timestamp, 1614556800);
         assert_eq!(parsed.signatures.len(), 1);
     }
@@ -349,7 +350,8 @@ mod tests {
             }
         }"#;
         
-        let event: WebhookEvent = serde_json::from_str(event_json).unwrap();
+        let event: WebhookEvent = serde_json::from_str(event_json)
+            .expect("Failed to parse valid webhook event JSON");
         
         assert_eq!(event.event_type_enum(), WebhookEventType::PaymentIntentSucceeded);
         assert_eq!(event.object_id(), Some("pi_test456".to_string()));

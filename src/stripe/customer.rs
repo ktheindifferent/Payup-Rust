@@ -308,11 +308,11 @@ impl Customer {
     /// // Update customer
     /// customer = cust.async_update(auth).await?;
     /// ```ignore
-    pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+    pub async fn async_update(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
         let request = reqwest::Client::new()
             .post(format!(
                 "https://api.stripe.com/v1/customers/{}",
-                self.clone().id.unwrap()
+                self.clone().id.ok_or_else(|| crate::error::PayupError::ValidationError("Customer ID is required for update".to_string()))?
             ))
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -358,10 +358,10 @@ impl Customer {
     ) -> Result<Customers, reqwest::Error> {
         let mut url = "https://api.stripe.com/v1/customers".to_string();
 
-        if starting_after.is_some() {
+        if let Some(ref after) = starting_after {
             url = format!(
                 "https://api.stripe.com/v1/customers?starting_after={}",
-                starting_after.unwrap()
+                after
             );
         }
 
