@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::stripe::Auth;
+use crate::http_client::{get_shared_client, get_shared_blocking_client};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Payout {
@@ -104,7 +105,7 @@ impl Payout {
     /// let created_payout = payout.post(auth)?;
     /// ```
     pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let mut params = std::collections::HashMap::new();
         
         params.insert("amount", self.amount.to_string());
@@ -137,7 +138,7 @@ impl Payout {
 
     /// Retrieve a payout
     pub fn get(creds: Auth, payout_id: String) -> Result<Self, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let url = format!("https://api.stripe.com/v1/payouts/{}", payout_id);
 
         let response = client
@@ -151,7 +152,7 @@ impl Payout {
     /// Update a payout
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         if let Some(id) = &self.id {
-            let client = reqwest::blocking::Client::new();
+            let client = get_shared_blocking_client();
             let url = format!("https://api.stripe.com/v1/payouts/{}", id);
             let mut params = std::collections::HashMap::new();
 
@@ -170,7 +171,7 @@ impl Payout {
             response.json()
         } else {
             // Return a mock error - in production, use proper error handling
-            let client = reqwest::blocking::Client::new();
+            let client = get_shared_blocking_client();
             let response = client.get("https://invalid.url").send()?;
             response.json()
         }
@@ -178,7 +179,7 @@ impl Payout {
 
     /// Cancel a payout
     pub fn cancel(creds: Auth, payout_id: String) -> Result<Self, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let url = format!("https://api.stripe.com/v1/payouts/{}/cancel", payout_id);
 
         let response = client
@@ -191,7 +192,7 @@ impl Payout {
 
     /// Reverse a payout
     pub fn reverse(creds: Auth, payout_id: String) -> Result<Self, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let url = format!("https://api.stripe.com/v1/payouts/{}/reverse", payout_id);
 
         let response = client
@@ -204,7 +205,7 @@ impl Payout {
 
     /// List all payouts
     pub fn list(creds: Auth, status: Option<PayoutStatus>, limit: Option<i32>) -> Result<PayoutList, reqwest::Error> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let mut url = String::from("https://api.stripe.com/v1/payouts?");
         
         if let Some(s) = status {
@@ -225,7 +226,7 @@ impl Payout {
 
     /// Async create a payout
     pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let mut params = std::collections::HashMap::new();
         
         params.insert("amount", self.amount.to_string());
@@ -251,7 +252,7 @@ impl Payout {
 
     /// Async retrieve a payout
     pub async fn async_get(creds: Auth, payout_id: String) -> Result<Self, reqwest::Error> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let url = format!("https://api.stripe.com/v1/payouts/{}", payout_id);
 
         let response = client
@@ -265,7 +266,7 @@ impl Payout {
 
     /// Async cancel a payout
     pub async fn async_cancel(creds: Auth, payout_id: String) -> Result<Self, reqwest::Error> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let url = format!("https://api.stripe.com/v1/payouts/{}/cancel", payout_id);
 
         let response = client
@@ -279,7 +280,7 @@ impl Payout {
 
     /// Async list all payouts
     pub async fn async_list(creds: Auth, status: Option<PayoutStatus>, limit: Option<i32>) -> Result<PayoutList, reqwest::Error> {
-        let client = reqwest::Client::new();
+        let client = get_shared_client();
         let mut url = String::from("https://api.stripe.com/v1/payouts?");
         
         if let Some(s) = status {

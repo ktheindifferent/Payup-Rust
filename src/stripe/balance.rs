@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::stripe::auth::Auth;
+use crate::http_client::{get_shared_client, get_shared_blocking_client};
 
 /// Represents your Stripe balance.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -30,7 +31,7 @@ impl Balance {
     /// ```ignore
     pub async fn async_get(creds: Auth) -> Result<Self, reqwest::Error> {
         let url = "https://api.stripe.com/v1/balance";
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -56,7 +57,7 @@ impl Balance {
     /// ```ignore
     pub fn get(creds: Auth) -> Result<Self, reqwest::Error> {
         let url = "https://api.stripe.com/v1/balance";
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -110,7 +111,7 @@ impl BalanceTransaction {
     /// ```ignore
     pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/balance_transactions/{}", id);
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
@@ -168,7 +169,7 @@ impl BalanceTransaction {
     /// ```ignore
     pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
         let url = format!("https://api.stripe.com/v1/balance_transactions/{}", id);
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -219,7 +220,7 @@ impl BalanceTransaction {
             None => "https://api.stripe.com/v1/balance_transactions".to_string(),
         };
 
-        let request = reqwest::blocking::Client::new()
+        let request = get_shared_blocking_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()?;
@@ -239,7 +240,7 @@ impl BalanceTransaction {
             None => "https://api.stripe.com/v1/balance_transactions".to_string(),
         };
 
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .get(url)
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .send()
