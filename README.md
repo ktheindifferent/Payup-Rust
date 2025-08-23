@@ -4,7 +4,24 @@
 
 A synchronous + asynchronous payment library for processing payments with rust + stripe. 
 
-I built this library due to a lack of synchronous payment libraries. Currently im only focused on features I need for another project. 
+I built this library due to a lack of synchronous payment libraries. Currently im only focused on features I need for another project.
+
+## 🔐 Security Notice
+
+**IMPORTANT**: Never hardcode API keys or credentials in your source code! See [SECURITY.md](SECURITY.md) for comprehensive security guidelines.
+
+### Quick Start - Secure Setup
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Add your actual API keys to `.env` (never commit this file!)
+
+3. Load credentials from environment variables in your code
+
+See the [Security Policy](SECURITY.md) for detailed security best practices. 
 
 ## Current Stripe Features:
 
@@ -100,13 +117,16 @@ payup = "0.1.45"
 Example:
 ```rust
 extern crate payup;
+use std::env;
 
 fn main() {
 
-    // Client and Secret for Stripe account
-    // In a production environment...load values from environment variables.
-    let client = format!("sk_test_");
-    let secret = format!("");
+    // SECURITY: Always load credentials from environment variables
+    // Never hardcode API keys in your source code!
+    let client = env::var("STRIPE_API_KEY")
+        .expect("STRIPE_API_KEY must be set in environment or .env file");
+    let secret = env::var("STRIPE_SECRET")
+        .unwrap_or_default(); // Optional secret, defaults to empty string
 
     // Create the Authentication refererence
     let auth = payup::stripe::Auth::new(client, secret);

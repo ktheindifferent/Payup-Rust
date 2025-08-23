@@ -4084,11 +4084,13 @@ impl Subscription {
     ///
     /// ```ignore
     /// // Client and Secret for Stripe account
-    /// // In a production environment...load values from environment variables.
-    /// let client = format!("sk_test_51Jo2sKGrEH09RU9uu8d8ARKasYUKHXAHk4vUNup1JLgP5wFnQQf6t7UpKfh7woVMhI9oeuziolW2dK1uwmgAheVI00bN8ews6g");
-    /// let secret = format!("");
+    /// // SECURITY: Always load credentials from environment variables!
+    /// let client = std::env::var("STRIPE_API_KEY")
+    ///     .expect("STRIPE_API_KEY must be set");
+    /// let secret = std::env::var("STRIPE_SECRET")
+    ///     .unwrap_or_default();
     /// // Create the Authentication refererence
-    /// let auth = payup::stripe::Auth::new("test_key".to_string(), "test_secret".to_string());
+    /// let auth = payup::stripe::Auth::new(client, secret);
     ///
     /// let get_subscription = payup::stripe::Subscription::get(auth, "subscription_id");
     /// ```ignore
