@@ -188,16 +188,21 @@ impl StripeProvider {
         }
     }
 
-    fn map_subscription_to_unified(&self, sub: &Subscription) -> UnifiedSubscription {
+    fn map_subscription_to_unified(&self, sub: &crate::stripe::response::Subscription) -> UnifiedSubscription {
         let status = sub.status.as_ref()
             .map(|s| self.map_subscription_status(s))
             .unwrap_or(SubscriptionStatus::Incomplete);
+
+        // Extract price_id from items if available
+        let price_id = sub.items.as_ref()
+            .and_then(|items| items.data.first())
+            .map(|item| item.id.clone());
 
         UnifiedSubscription {
             id: sub.id.clone(),
             customer_id: sub.customer.clone().unwrap_or_default(),
             plan_id: None, // Stripe uses price_id instead
-            price_id: sub.plan.as_ref().and_then(|p| p.id.clone()),
+            price_id,
             status,
             current_period_start: sub.current_period_start,
             current_period_end: sub.current_period_end,
@@ -408,39 +413,110 @@ impl PaymentProvider for StripeProvider {
             .collect())
     }
 
-    async fn create_subscription(&self, _subscription: &UnifiedSubscription) -> Result<UnifiedSubscription> {
-        // TODO: Implement proper Subscription creation using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "Subscription creation not yet implemented for Stripe provider".to_string()
-        ))
+    async fn create_subscription(&self, subscription: &UnifiedSubscription) -> Result<UnifiedSubscription> {
+        let mut stripe_sub = Subscription::new();
+        stripe_sub.customer = Some(subscription.customer_id.clone());
+        
+        // Set price ID if provided
+        if let Some(price_id) = &subscription.price_id {
+            stripe_sub.price_items = Some(vec![price_id.clone()]);
+        } else if let Some(plan_id) = &subscription.plan_id {
+            // Support legacy plan_id as well
+            stripe_sub.price_items = Some(vec![plan_id.clone()]);
+        } else {
+            return Err(PayupError::ValidationError(
+                "Either price_id or plan_id must be provided for subscription".to_string()
+            ));
+        }
+        
+        // Set cancel_at_period_end if needed
+        stripe_sub.cancel_at_period_end = Some(subscription.cancel_at_period_end);
+        
+        let stripe_response = stripe_sub.async_post(self.auth.clone()).await
+            .map_err(|e| PayupError::ApiError {
+                code: "subscription_create_error".to_string(),
+                message: format!("Failed to create subscription: {}", e),
+                provider: "stripe".to_string(),
+            })?;
+        
+        Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
-    async fn get_subscription(&self, _subscription_id: &str) -> Result<UnifiedSubscription> {
-        // TODO: Implement proper Subscription retrieval using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "Subscription retrieval not yet implemented for Stripe provider".to_string()
-        ))
+    async fn get_subscription(&self, subscription_id: &str) -> Result<UnifiedSubscription> {
+        let stripe_response = Subscription::async_get(
+            self.auth.clone(),
+            subscription_id.to_string()
+        ).await
+            .map_err(|e| PayupError::ApiError {
+                code: "subscription_get_error".to_string(),
+                message: format!("Failed to get subscription: {}", e),
+                provider: "stripe".to_string(),
+            })?;
+        
+        Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
-    async fn update_subscription(&self, _subscription: &UnifiedSubscription) -> Result<UnifiedSubscription> {
-        // TODO: Implement proper Subscription update using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "Subscription update not yet implemented for Stripe provider".to_string()
-        ))
+    async fn update_subscription(&self, subscription: &UnifiedSubscription) -> Result<UnifiedSubscription> {
+        if subscription.id.is_none() {
+            return Err(PayupError::ValidationError(
+                "Subscription ID is required for update".to_string()
+            ));
+        }
+        
+        let mut stripe_sub = Subscription::new();
+        stripe_sub.id = subscription.id.clone();
+        
+        // Update price if provided
+        if let Some(price_id) = &subscription.price_id {
+            stripe_sub.price_items = Some(vec![price_id.clone()]);
+        } else if let Some(plan_id) = &subscription.plan_id {
+            stripe_sub.price_items = Some(vec![plan_id.clone()]);
+        }
+        
+        // Update cancel_at_period_end
+        stripe_sub.cancel_at_period_end = Some(subscription.cancel_at_period_end);
+        
+        let stripe_response = stripe_sub.async_update(self.auth.clone()).await
+            .map_err(|e| PayupError::ApiError {
+                code: "subscription_update_error".to_string(),
+                message: format!("Failed to update subscription: {}", e),
+                provider: "stripe".to_string(),
+            })?;
+        
+        Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
-    async fn cancel_subscription(&self, _subscription_id: &str, _at_period_end: bool) -> Result<UnifiedSubscription> {
-        // TODO: Implement proper Subscription cancellation using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "Subscription cancellation not yet implemented for Stripe provider".to_string()
-        ))
+    async fn cancel_subscription(&self, subscription_id: &str, at_period_end: bool) -> Result<UnifiedSubscription> {
+        let stripe_response = Subscription::async_cancel(
+            self.auth.clone(),
+            subscription_id.to_string(),
+            at_period_end
+        ).await
+            .map_err(|e| PayupError::ApiError {
+                code: "subscription_cancel_error".to_string(),
+                message: format!("Failed to cancel subscription: {}", e),
+                provider: "stripe".to_string(),
+            })?;
+        
+        Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
-    async fn list_subscriptions(&self, _customer_id: Option<&str>, _limit: Option<u32>) -> Result<Vec<UnifiedSubscription>> {
-        // TODO: Implement proper Subscription listing using Stripe API
-        Err(PayupError::UnsupportedOperation(
-            "Subscription listing not yet implemented for Stripe provider".to_string()
-        ))
+    async fn list_subscriptions(&self, customer_id: Option<&str>, limit: Option<u32>) -> Result<Vec<UnifiedSubscription>> {
+        let stripe_response = Subscription::async_list(
+            self.auth.clone(),
+            customer_id.map(String::from),
+            limit.map(|l| l as i32)
+        ).await
+            .map_err(|e| PayupError::ApiError {
+                code: "subscription_list_error".to_string(),
+                message: format!("Failed to list subscriptions: {}", e),
+                provider: "stripe".to_string(),
+            })?;
+        
+        Ok(stripe_response.data
+            .iter()
+            .map(|s| self.map_subscription_to_unified(s))
+            .collect())
     }
 
     async fn verify_webhook(&self, payload: &[u8], signature: &str, secret: &str) -> Result<bool> {
