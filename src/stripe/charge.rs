@@ -181,10 +181,10 @@ impl Charge {
     /// // Fetch customer using id
     /// let captured_charge = charge.async_capture(auth.clone()).await?;
     /// ```ignore
-    pub async fn async_capture(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+    pub async fn async_capture(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
         let url = format!(
             "https://api.stripe.com/v1/charges/{}/capture",
-            self.id.clone().unwrap()
+            self.id.clone().ok_or_else(|| crate::error::PayupError::ValidationError("Charge ID is required for capture".to_string()))?
         );
 
         let request = get_shared_client()
@@ -307,11 +307,16 @@ impl Charge {
     /// charge.receipt_email = Some("testchanged@test.com".to_string());
     /// charge = charge.async_update(auth.clone()).await?;
     /// ```ignore
+<<<<<<< HEAD
+    pub async fn async_update(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
+        let request = reqwest::Client::new()
+=======
     pub async fn async_update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = get_shared_client()
+>>>>>>> origin/master
             .post(format!(
                 "https://api.stripe.com/v1/charges/{}",
-                self.clone().id.unwrap()
+                self.clone().id.ok_or_else(|| crate::error::PayupError::ValidationError("Charge ID is required for update".to_string()))?
             ))
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -348,7 +353,7 @@ impl Charge {
     /// // Fetch customer using id
     /// let captured_charge = charge.capture(auth.clone())?;
     /// ```ignore
-    pub fn capture(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+    pub fn capture(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
         let url = format!(
             "https://api.stripe.com/v1/charges/{}/capture",
             self.id.clone().unwrap()
@@ -471,11 +476,16 @@ impl Charge {
     /// charge.receipt_email = Some("testchanged@test.com".to_string());
     /// charge = charge.update(auth.clone()).await?;
     /// ```ignore
+<<<<<<< HEAD
+    pub fn update(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
+        let request = reqwest::blocking::Client::new()
+=======
     pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
         let request = get_shared_blocking_client()
+>>>>>>> origin/master
             .post(format!(
                 "https://api.stripe.com/v1/charges/{}",
-                self.clone().id.unwrap()
+                self.clone().id.ok_or_else(|| crate::error::PayupError::ValidationError("Charge ID is required for update".to_string()))?
             ))
             .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
             .form(&self.to_params())
@@ -491,7 +501,7 @@ impl Charge {
         if starting_after.is_some() {
             url = format!(
                 "https://api.stripe.com/v1/charges?starting_after={}",
-                starting_after.unwrap()
+                starting_after.expect("starting_after should be Some at this point")
             );
         }
 
@@ -513,7 +523,7 @@ impl Charge {
         if starting_after.is_some() {
             url = format!(
                 "https://api.stripe.com/v1/charges?starting_after={}",
-                starting_after.unwrap()
+                starting_after.expect("starting_after should be Some at this point")
             );
         }
 
