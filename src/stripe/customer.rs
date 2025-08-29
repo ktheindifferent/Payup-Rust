@@ -310,7 +310,7 @@ impl Customer {
     /// customer = cust.async_update(auth).await?;
     /// ```ignore
     pub async fn async_update(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
-        let request = reqwest::Client::new()
+        let request = get_shared_client()
             .post(format!(
                 "https://api.stripe.com/v1/customers/{}",
                 self.clone().id.ok_or_else(|| crate::error::PayupError::ValidationError("Customer ID is required for update".to_string()))?

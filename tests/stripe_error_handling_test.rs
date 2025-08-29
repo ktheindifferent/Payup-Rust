@@ -15,11 +15,11 @@ fn test_charge_capture_without_id_returns_error() {
     // This should return an error, not panic
     let result = charge.capture(auth);
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Charge ID is required for capture"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -31,11 +31,11 @@ fn test_charge_update_without_id_returns_error() {
 
     let result = charge.update(auth);
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Charge ID is required for update"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -50,11 +50,11 @@ fn test_customer_update_without_id_returns_error() {
     let result = runtime.block_on(customer.async_update(auth));
     
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Customer ID is required for update"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -67,11 +67,11 @@ fn test_original_charge_capture_without_id_returns_error() {
 
     let result = charge.capture(auth);
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Charge ID is required for capture"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -83,11 +83,11 @@ fn test_original_charge_update_without_id_returns_error() {
 
     let result = charge.update(auth);
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Charge ID is required for update"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -99,11 +99,11 @@ fn test_original_customer_update_without_id_returns_error() {
 
     let result = customer.update(auth);
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Customer ID is required for update"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -115,11 +115,11 @@ fn test_dispute_close_without_id_returns_error() {
 
     let result = dispute.close(auth);
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Dispute ID is required for close"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -131,11 +131,11 @@ fn test_dispute_update_without_id_returns_error() {
 
     let result = dispute.update(auth);
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Dispute ID is required for update"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -147,11 +147,11 @@ fn test_file_link_update_without_id_returns_error() {
 
     let result = file_link.update(auth);
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("FileLink ID is required for update"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -163,11 +163,11 @@ fn test_invoice_update_without_id_returns_error() {
 
     let result = invoice.update(auth);
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Invoice ID is required for update"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -179,11 +179,11 @@ fn test_subscription_update_without_id_returns_error() {
 
     let result = subscription.update(auth);
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Subscription ID is required for update"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -196,11 +196,11 @@ async fn test_async_charge_capture_without_id_returns_error() {
 
     let result = charge.async_capture(auth).await;
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Charge ID is required for capture"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -212,11 +212,11 @@ async fn test_async_original_charge_capture_without_id_returns_error() {
 
     let result = charge.async_capture(auth).await;
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Charge ID is required for capture"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }
 
@@ -228,10 +228,10 @@ async fn test_async_dispute_close_without_id_returns_error() {
 
     let result = dispute.async_close(auth).await;
     assert!(result.is_err());
-    match result.unwrap_err() {
+    match result.expect_err("Should return error for invalid operation") {
         PayupError::ValidationError(msg) => {
             assert!(msg.contains("Dispute ID is required for close"));
         }
-        _ => panic!("Expected ValidationError"),
+        other => assert!(false, "Expected ValidationError, got {:?}", other),
     }
 }

@@ -177,3 +177,105 @@ impl WebhookHandler {
         }
     }
 }
+
+// PayPal Webhook Handler with local signature verification capabilities
+pub struct PayPalWebhookHandler {
+    webhook_id: String,
+}
+
+impl PayPalWebhookHandler {
+    pub fn new(webhook_id: String) -> Self {
+        Self { webhook_id }
+    }
+    
+    /// Extract PayPal webhook headers from HTTP headers
+    pub fn extract_headers(http_headers: &[(String, String)]) -> HashMap<String, String> {
+        let mut headers = HashMap::new();
+        for (key, value) in http_headers {
+            let lower_key = key.to_lowercase();
+            if lower_key.starts_with("paypal-") {
+                headers.insert(lower_key, value.clone());
+            }
+        }
+        headers
+    }
+    
+    /// Verify webhook using PayPal's API
+    pub async fn verify_with_api(
+        &self,
+        client: &mut PayPalClient,
+        headers: HashMap<String, String>,
+        body: &str,
+    ) -> Result<bool> {
+        WebhookEvent::async_verify(client, headers, body, &self.webhook_id).await
+    }
+    
+    /// Verify webhook using PayPal's API (synchronous)
+    pub fn verify_with_api_sync(
+        &self,
+        client: &mut PayPalClient,
+        headers: HashMap<String, String>,
+        body: &str,
+    ) -> Result<bool> {
+        WebhookEvent::verify(client, headers, body, &self.webhook_id)
+    }
+    
+    /// Parse and verify a webhook in one step
+    pub async fn parse_and_verify(
+        &self,
+        client: &mut PayPalClient,
+        headers: HashMap<String, String>,
+        body: &str,
+    ) -> Result<WebhookEvent> {
+        // First verify the webhook
+        let is_valid = self.verify_with_api(client, headers, body).await?;
+        
+        if !is_valid {
+            return Err(PayupError::WebhookVerificationFailed(
+                "PayPal webhook signature verification failed".to_string()
+            ));
+        }
+        
+        // Then parse the event
+        WebhookEvent::parse(body)
+    }
+    
+    /// Validate required headers are present
+    pub fn validate_headers(headers: &HashMap<String, String>) -> Result<()> {
+        const REQUIRED_HEADERS: &[&str] = &[
+            "paypal-auth-algo",
+            "paypal-cert-url",
+            "paypal-transmission-id",
+            "paypal-transmission-sig",
+            "paypal-transmission-time",
+        ];
+        
+        for header in REQUIRED_HEADERS {
+            if !headers.contains_key(*header) {
+                return Err(PayupError::ValidationError(
+                    format!("Missing required header: {}", header)
+                ));
+            }
+        }
+        
+        // Validate cert URL is from PayPal domain
+        if let Some(cert_url) = headers.get("paypal-cert-url") {
+            if !cert_url.contains("paypal.com") {
+                return Err(PayupError::ValidationError(
+                    "Invalid cert URL: must be from paypal.com domain".to_string()
+                ));
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Create headers HashMap from raw HTTP headers for convenience
+    pub fn headers_from_slice(raw_headers: &[(&str, &str)]) -> HashMap<String, String> {
+        let mut headers = HashMap::new();
+        for (key, value) in raw_headers {
+            headers.insert(key.to_lowercase(), value.to_string());
+        }
+        headers
+    }
+}

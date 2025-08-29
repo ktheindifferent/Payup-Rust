@@ -57,6 +57,9 @@ pub enum PayupError {
     // Unsupported operation
     UnsupportedOperation(String),
     
+    // Webhook verification
+    WebhookVerificationFailed(String),
+    
     // Additional HTTP errors for better granularity
     Http(String),
     BadRequest(String),
@@ -124,6 +127,9 @@ impl fmt::Display for PayupError {
             
             PayupError::UnsupportedOperation(msg) => 
                 write!(f, "Unsupported operation: {}", msg),
+            
+            PayupError::WebhookVerificationFailed(msg) => 
+                write!(f, "Webhook verification failed: {}", msg),
             
             PayupError::Http(msg) => 
                 write!(f, "HTTP error: {}", msg),
