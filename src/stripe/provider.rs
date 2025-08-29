@@ -119,7 +119,7 @@ impl StripeProvider {
         };
 
         UnifiedCharge {
-            id: pi.id.clone(),
+            id: Some(pi.id.clone()),
             amount: Money {
                 amount: pi.amount,
                 currency: pi.currency.clone(),
@@ -140,7 +140,7 @@ impl StripeProvider {
             } else {
                 ChargeStatus::Processing
             }
-        } else if charge.failure_code.is_some() {
+        } else if charge.paid == Some(false) {
             ChargeStatus::Failed
         } else {
             ChargeStatus::Pending
@@ -149,14 +149,14 @@ impl StripeProvider {
         UnifiedCharge {
             id: charge.id.clone(),
             amount: Money {
-                amount: charge.amount.unwrap_or(0),
+                amount: charge.amount.as_ref().and_then(|a| a.parse().ok()).unwrap_or(0),
                 currency: charge.currency.clone().unwrap_or_else(|| "usd".to_string()),
             },
             customer_id: charge.customer.clone(),
             payment_method_id: charge.payment_method.clone(),
             status,
             description: charge.description.clone(),
-            metadata: charge.metadata.clone(),
+            metadata: None,
             created_at: charge.created.map(|c| c as i64),
         }
     }
@@ -375,8 +375,7 @@ impl PaymentProvider for StripeProvider {
             customer: charge.customer_id.clone(),
             payment_method: charge.payment_method_id.clone(),
             description: charge.description.clone(),
-            metadata: charge.metadata.clone(),
-            confirm: Some(true),
+            metadata: None,
             ..Default::default()
         };
 
@@ -400,7 +399,10 @@ impl PaymentProvider for StripeProvider {
         if charge_id.starts_with("pi_") {
             let params = CapturePaymentIntentParams {
                 amount_to_capture: amount.map(|m| m.amount),
-                ..Default::default()
+                application_fee_amount: None,
+                statement_descriptor: None,
+                statement_descriptor_suffix: None,
+                transfer_data: None,
             };
             let pi = PaymentIntent::capture_async(&self.auth, charge_id, params).await?;
             Ok(self.map_payment_intent_to_charge(&pi))
@@ -408,7 +410,7 @@ impl PaymentProvider for StripeProvider {
             // Fall back to legacy Charge API - need to get charge first then capture
             let mut charge = Charge::async_get(self.auth.clone(), charge_id.to_string()).await?;
             if let Some(amt) = amount {
-                charge.amount = Some(amt.amount);
+                charge.amount = Some(amt.amount.to_string());
             }
             let captured = charge.async_capture(self.auth.clone()).await?;
             Ok(self.map_charge_to_unified(&captured))
