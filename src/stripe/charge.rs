@@ -3,6 +3,91 @@ use serde::{Deserialize, Serialize};
 use crate::stripe::auth::Auth;
 use crate::http_client::{get_shared_client, get_shared_blocking_client};
 
+/// Shipping information for charges
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Shipping {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address: Option<ShippingAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub carrier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phone: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tracking_number: Option<String>,
+}
+
+/// Shipping address information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShippingAddress {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line1: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line2: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub postal_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state: Option<String>,
+}
+
+impl Shipping {
+    pub fn new() -> Self {
+        Shipping {
+            address: None,
+            carrier: None,
+            name: None,
+            phone: None,
+            tracking_number: None,
+        }
+    }
+
+    /// Convert to URL-encoded parameters for API requests
+    pub fn to_params(&self) -> Vec<(String, String)> {
+        let mut params = Vec::new();
+        
+        if let Some(address) = &self.address {
+            if let Some(city) = &address.city {
+                params.push(("shipping[address][city]".to_string(), city.clone()));
+            }
+            if let Some(country) = &address.country {
+                params.push(("shipping[address][country]".to_string(), country.clone()));
+            }
+            if let Some(line1) = &address.line1 {
+                params.push(("shipping[address][line1]".to_string(), line1.clone()));
+            }
+            if let Some(line2) = &address.line2 {
+                params.push(("shipping[address][line2]".to_string(), line2.clone()));
+            }
+            if let Some(postal_code) = &address.postal_code {
+                params.push(("shipping[address][postal_code]".to_string(), postal_code.clone()));
+            }
+            if let Some(state) = &address.state {
+                params.push(("shipping[address][state]".to_string(), state.clone()));
+            }
+        }
+        
+        if let Some(carrier) = &self.carrier {
+            params.push(("shipping[carrier]".to_string(), carrier.clone()));
+        }
+        if let Some(name) = &self.name {
+            params.push(("shipping[name]".to_string(), name.clone()));
+        }
+        if let Some(phone) = &self.phone {
+            params.push(("shipping[phone]".to_string(), phone.clone()));
+        }
+        if let Some(tracking_number) = &self.tracking_number {
+            params.push(("shipping[tracking_number]".to_string(), tracking_number.clone()));
+        }
+        
+        params
+    }
+}
+
 // TODO - Finish Implementation
 /// You can store multiple cards on a customer in order to charge the customer later.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -91,7 +176,8 @@ pub struct Charge {
     // #[serde(rename = "receipt_number")]
     // pub receipt_number: Value,
     // pub review: Value,
-    // pub shipping: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shipping: Option<Shipping>,
     // #[serde(rename = "source_transfer")]
     // pub source_transfer: Value,
     #[serde(rename = "statement_descriptor")]
@@ -152,6 +238,7 @@ impl Charge {
             receipt_email: None,
             statement_descriptor: None,
             statement_descriptor_suffix: None,
+            shipping: None,
         };
     }
 
@@ -554,51 +641,38 @@ impl Charge {
         return params;
     }
 
-    fn to_params(&self) -> Vec<(&str, &str)> {
+    fn to_params(&self) -> Vec<(String, String)> {
         let mut params = vec![];
-        match &self.customer {
-            Some(customer) => params.push(("customer", customer.as_str())),
-            None => {}
+        if let Some(customer) = &self.customer {
+            params.push(("customer".to_string(), customer.clone()));
         }
-        match &self.description {
-            Some(description) => params.push(("description", description.as_str())),
-            None => {}
+        if let Some(description) = &self.description {
+            params.push(("description".to_string(), description.clone()));
         }
-        match &self.receipt_email {
-            Some(receipt_email) => params.push(("receipt_email", receipt_email.as_str())),
-            None => {}
+        if let Some(receipt_email) = &self.receipt_email {
+            params.push(("receipt_email".to_string(), receipt_email.clone()));
         }
-        match &self.amount {
-            Some(amount) => params.push(("amount", amount.as_str())),
-            None => {}
+        if let Some(amount) = &self.amount {
+            params.push(("amount".to_string(), amount.clone()));
         }
-        match &self.currency {
-            Some(currency) => params.push(("currency", currency.as_str())),
-            None => {}
+        if let Some(currency) = &self.currency {
+            params.push(("currency".to_string(), currency.clone()));
         }
-        // TODO - Impliment Shipping
-        // match &self.shipping{
-        //     Some(shipping) => params.push(("shipping", shipping.as_str())),
-        //     None => {}
-        // }
-        match &self.source {
-            Some(source) => params.push(("source", source.as_str())),
-            None => {}
+        // Handle shipping parameters
+        if let Some(shipping) = &self.shipping {
+            let shipping_params = shipping.to_params();
+            params.extend(shipping_params);
         }
-        match &self.statement_descriptor {
-            Some(statement_descriptor) => {
-                params.push(("statement_descriptor", statement_descriptor.as_str()))
-            }
-            None => {}
+        if let Some(source) = &self.source {
+            params.push(("source".to_string(), source.clone()));
         }
-        match &self.statement_descriptor_suffix {
-            Some(statement_descriptor_suffix) => params.push((
-                "statement_descriptor_suffix",
-                statement_descriptor_suffix.as_str(),
-            )),
-            None => {}
+        if let Some(statement_descriptor) = &self.statement_descriptor {
+            params.push(("statement_descriptor".to_string(), statement_descriptor.clone()));
         }
-        return params;
+        if let Some(statement_descriptor_suffix) = &self.statement_descriptor_suffix {
+            params.push(("statement_descriptor_suffix".to_string(), statement_descriptor_suffix.clone()));
+        }
+        params
     }
 }
 
