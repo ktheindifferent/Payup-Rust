@@ -63,13 +63,13 @@ async fn test_create_payment_method_async() {
             assert_eq!(payment_method.object, Some("payment_method".to_string()));
             assert!(payment_method.card.is_some());
             
-            let card = payment_method.card.unwrap();
+            let card = payment_method.card.expect("Payment method should have card details");
             assert_eq!(card.last4, Some("4242".to_string()));
             assert_eq!(card.brand, Some("visa".to_string()));
         }
         Err(e) => {
             eprintln!("Error creating payment method: {:?}", e);
-            panic!("Failed to create payment method");
+            assert!(false, "Failed to create payment method: {:?}", e);
         }
     }
 }
@@ -92,8 +92,9 @@ async fn test_retrieve_payment_method_async() {
         metadata: None,
     };
     
-    let created = PaymentMethod::create_async(&auth, params).await.unwrap();
-    let payment_method_id = created.id.unwrap();
+    let created = PaymentMethod::create_async(&auth, params).await
+        .expect("Failed to create payment method for test");
+    let payment_method_id = created.id.expect("Created payment method should have an ID");
     
     // Now retrieve it
     let retrieved = PaymentMethod::retrieve_async(&auth, &payment_method_id).await;
@@ -105,7 +106,7 @@ async fn test_retrieve_payment_method_async() {
         }
         Err(e) => {
             eprintln!("Error retrieving payment method: {:?}", e);
-            panic!("Failed to retrieve payment method");
+            assert!(false, "Failed to retrieve payment method: {:?}", e);
         }
     }
 }
@@ -128,13 +129,14 @@ async fn test_attach_and_detach_payment_method_async() {
         metadata: None,
     };
     
-    let created = PaymentMethod::create_async(&auth, params).await.unwrap();
-    let payment_method_id = created.id.unwrap();
+    let created = PaymentMethod::create_async(&auth, params).await
+        .expect("Failed to create payment method for test");
+    let payment_method_id = created.id.expect("Created payment method should have an ID");
     
     // Create a customer to attach the payment method to
     use payup::stripe::Customer;
-    let customer = Customer::create(&auth).unwrap();
-    let customer_id = customer.id.unwrap();
+    let customer = Customer::create(&auth).expect("Failed to create customer for test");
+    let customer_id = customer.id.expect("Created customer should have an ID");
     
     // Attach the payment method to the customer
     let attached = PaymentMethod::attach_async(&auth, &payment_method_id, &customer_id).await;
@@ -144,7 +146,7 @@ async fn test_attach_and_detach_payment_method_async() {
         }
         Err(e) => {
             eprintln!("Error attaching payment method: {:?}", e);
-            panic!("Failed to attach payment method");
+            assert!(false, "Failed to attach payment method: {:?}", e);
         }
     }
     
@@ -156,7 +158,7 @@ async fn test_attach_and_detach_payment_method_async() {
         }
         Err(e) => {
             eprintln!("Error detaching payment method: {:?}", e);
-            panic!("Failed to detach payment method");
+            assert!(false, "Failed to detach payment method: {:?}", e);
         }
     }
 }
@@ -169,7 +171,7 @@ async fn test_provider_create_payment_method() {
         return;
     }
 
-    let api_key = get_test_api_key().unwrap();
+    let api_key = get_test_api_key().expect("STRIPE_TEST_API_KEY should be available after check");
     let provider = StripeProvider::new(api_key);
     
     let payment_method = UnifiedPaymentMethod {
@@ -193,13 +195,13 @@ async fn test_provider_create_payment_method() {
             assert_eq!(created.method_type, PaymentMethodType::Card);
             assert!(created.card.is_some());
             
-            let card = created.card.unwrap();
+            let card = created.card.expect("Created payment method should have card details");
             assert_eq!(card.last4, Some("4242".to_string()));
             assert_eq!(card.brand, Some("visa".to_string()));
         }
         Err(e) => {
             eprintln!("Error creating payment method via provider: {:?}", e);
-            panic!("Failed to create payment method via provider");
+            assert!(false, "Failed to create payment method via provider: {:?}", e);
         }
     }
 }
@@ -212,7 +214,7 @@ async fn test_provider_get_payment_method() {
         return;
     }
 
-    let api_key = get_test_api_key().unwrap();
+    let api_key = get_test_api_key().expect("STRIPE_TEST_API_KEY should be available after check");
     let provider = StripeProvider::new(api_key);
     
     // First create a payment method
@@ -230,8 +232,9 @@ async fn test_provider_get_payment_method() {
         bank_account: None,
     };
     
-    let created = provider.create_payment_method(&payment_method).await.unwrap();
-    let payment_method_id = created.id.unwrap();
+    let created = provider.create_payment_method(&payment_method).await
+        .expect("Failed to create payment method for test");
+    let payment_method_id = created.id.expect("Created payment method should have an ID");
     
     // Now retrieve it
     let retrieved = provider.get_payment_method(&payment_method_id).await;
@@ -243,7 +246,7 @@ async fn test_provider_get_payment_method() {
         }
         Err(e) => {
             eprintln!("Error retrieving payment method via provider: {:?}", e);
-            panic!("Failed to retrieve payment method via provider");
+            assert!(false, "Failed to retrieve payment method via provider: {:?}", e);
         }
     }
 }
@@ -256,7 +259,7 @@ async fn test_provider_attach_detach_payment_method() {
         return;
     }
 
-    let api_key = get_test_api_key().unwrap();
+    let api_key = get_test_api_key().expect("STRIPE_TEST_API_KEY should be available after check");
     let provider = StripeProvider::new(api_key);
     
     // Create a payment method
@@ -274,8 +277,9 @@ async fn test_provider_attach_detach_payment_method() {
         bank_account: None,
     };
     
-    let created = provider.create_payment_method(&payment_method).await.unwrap();
-    let payment_method_id = created.id.unwrap();
+    let created = provider.create_payment_method(&payment_method).await
+        .expect("Failed to create payment method for test");
+    let payment_method_id = created.id.expect("Created payment method should have an ID");
     
     // Create a customer
     use payup::payment_provider::Customer;
@@ -287,8 +291,9 @@ async fn test_provider_attach_detach_payment_method() {
         metadata: None,
     };
     
-    let created_customer = provider.create_customer(&customer).await.unwrap();
-    let customer_id = created_customer.id.unwrap();
+    let created_customer = provider.create_customer(&customer).await
+        .expect("Failed to create customer for test");
+    let customer_id = created_customer.id.expect("Created customer should have an ID");
     
     // Attach payment method to customer
     let attached = provider.attach_payment_method(&payment_method_id, &customer_id).await;
@@ -322,8 +327,8 @@ fn test_sync_payment_method_create() {
         }
         Err(e) => {
             eprintln!("Error creating payment method (sync): {:?}", e);
-            if !get_test_api_key().unwrap().starts_with("sk_test_") {
-                panic!("Failed to create payment method - ensure you're using a test API key");
+            if !get_test_api_key().expect("API key should exist").starts_with("sk_test_") {
+                assert!(false, "Failed to create payment method - ensure you're using a test API key");
             }
         }
     }
@@ -346,8 +351,9 @@ fn test_sync_payment_method_retrieve() {
         metadata: None,
     };
     
-    let created = PaymentMethod::create(&auth, params).unwrap();
-    let payment_method_id = created.id.unwrap();
+    let created = PaymentMethod::create(&auth, params)
+        .expect("Failed to create payment method for test");
+    let payment_method_id = created.id.expect("Created payment method should have an ID");
     
     // Now retrieve it
     let retrieved = PaymentMethod::retrieve(&auth, &payment_method_id);
@@ -358,7 +364,7 @@ fn test_sync_payment_method_retrieve() {
         }
         Err(e) => {
             eprintln!("Error retrieving payment method (sync): {:?}", e);
-            panic!("Failed to retrieve payment method");
+            assert!(false, "Failed to retrieve payment method: {:?}", e);
         }
     }
 }

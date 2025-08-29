@@ -15,13 +15,13 @@ mod payment_intent_tests {
         
         // Test serialization/deserialization of status variants
         let status = PaymentIntentStatus::RequiresPaymentMethod;
-        let serialized = serde_json::to_string(&status).unwrap();
+        let serialized = serde_json::to_string(&status).expect("Failed to serialize PaymentIntentStatus");
         assert_eq!(serialized, "\"requires_payment_method\"");
         
-        let deserialized: PaymentIntentStatus = serde_json::from_str(&serialized).unwrap();
+        let deserialized: PaymentIntentStatus = serde_json::from_str(&serialized).expect("Failed to deserialize PaymentIntentStatus");
         match deserialized {
             PaymentIntentStatus::RequiresPaymentMethod => {},
-            _ => panic!("Wrong variant"),
+            _ => assert!(false, "Expected RequiresPaymentMethod variant, got something else"),
         }
     }
 
@@ -53,9 +53,9 @@ mod payment_intent_tests {
         
         assert_eq!(params.amount, 2000);
         assert_eq!(params.currency, "usd");
-        assert_eq!(params.customer.unwrap(), "cus_123");
-        assert_eq!(params.description.unwrap(), "Test payment");
-        assert_eq!(params.receipt_email.unwrap(), "test@example.com");
+        assert_eq!(params.customer.as_deref(), Some("cus_123"));
+        assert_eq!(params.description.as_deref(), Some("Test payment"));
+        assert_eq!(params.receipt_email.as_deref(), Some("test@example.com"));
         assert!(params.automatic_payment_methods.is_some());
         assert!(params.capture_method.is_some());
         assert!(params.confirmation_method.is_some());
@@ -92,8 +92,8 @@ mod payment_intent_tests {
             shipping: None,
         };
         
-        assert_eq!(params.payment_method.unwrap(), "pm_123");
-        assert_eq!(params.return_url.unwrap(), "https://example.com/return");
+        assert_eq!(params.payment_method.as_deref(), Some("pm_123"));
+        assert_eq!(params.return_url.as_deref(), Some("https://example.com/return"));
         assert!(params.setup_future_usage.is_some());
     }
 
@@ -107,10 +107,10 @@ mod payment_intent_tests {
             transfer_data: None,
         };
         
-        assert_eq!(params.amount_to_capture.unwrap(), 1500);
-        assert_eq!(params.application_fee_amount.unwrap(), 100);
-        assert_eq!(params.statement_descriptor.unwrap(), "CAPTURE");
-        assert_eq!(params.statement_descriptor_suffix.unwrap(), "ORDER");
+        assert_eq!(params.amount_to_capture, Some(1500));
+        assert_eq!(params.application_fee_amount, Some(100));
+        assert_eq!(params.statement_descriptor.as_deref(), Some("CAPTURE"));
+        assert_eq!(params.statement_descriptor_suffix.as_deref(), Some("ORDER"));
     }
 
     #[test]
@@ -119,7 +119,7 @@ mod payment_intent_tests {
             cancellation_reason: Some("requested_by_customer".to_string()),
         };
         
-        assert_eq!(params.cancellation_reason.unwrap(), "requested_by_customer");
+        assert_eq!(params.cancellation_reason.as_deref(), Some("requested_by_customer"));
     }
 
     #[test]
@@ -133,12 +133,12 @@ mod payment_intent_tests {
             state: Some("CA".to_string()),
         };
         
-        assert_eq!(address.city.unwrap(), "San Francisco");
-        assert_eq!(address.country.unwrap(), "US");
-        assert_eq!(address.line1.unwrap(), "123 Main St");
-        assert_eq!(address.line2.unwrap(), "Apt 1");
-        assert_eq!(address.postal_code.unwrap(), "94102");
-        assert_eq!(address.state.unwrap(), "CA");
+        assert_eq!(address.city.as_deref(), Some("San Francisco"));
+        assert_eq!(address.country.as_deref(), Some("US"));
+        assert_eq!(address.line1.as_deref(), Some("123 Main St"));
+        assert_eq!(address.line2.as_deref(), Some("Apt 1"));
+        assert_eq!(address.postal_code.as_deref(), Some("94102"));
+        assert_eq!(address.state.as_deref(), Some("CA"));
     }
 
     #[test]
@@ -159,10 +159,10 @@ mod payment_intent_tests {
         };
         
         assert!(shipping.address.is_some());
-        assert_eq!(shipping.carrier.unwrap(), "FedEx");
-        assert_eq!(shipping.name.unwrap(), "John Doe");
-        assert_eq!(shipping.phone.unwrap(), "+1-555-123-4567");
-        assert_eq!(shipping.tracking_number.unwrap(), "123456789");
+        assert_eq!(shipping.carrier.as_deref(), Some("FedEx"));
+        assert_eq!(shipping.name.as_deref(), Some("John Doe"));
+        assert_eq!(shipping.phone.as_deref(), Some("+1-555-123-4567"));
+        assert_eq!(shipping.tracking_number.as_deref(), Some("123456789"));
     }
 
     #[test]
@@ -172,7 +172,7 @@ mod payment_intent_tests {
             destination: "acct_123".to_string(),
         };
         
-        assert_eq!(transfer_data.amount.unwrap(), 500);
+        assert_eq!(transfer_data.amount, Some(500));
         assert_eq!(transfer_data.destination, "acct_123");
     }
 
@@ -181,11 +181,11 @@ mod payment_intent_tests {
         use serde_json;
         
         let method = ConfirmationMethod::Automatic;
-        let serialized = serde_json::to_string(&method).unwrap();
+        let serialized = serde_json::to_string(&method).expect("Failed to serialize ConfirmationMethod");
         assert_eq!(serialized, "\"automatic\"");
         
         let method = ConfirmationMethod::Manual;
-        let serialized = serde_json::to_string(&method).unwrap();
+        let serialized = serde_json::to_string(&method).expect("Failed to serialize ConfirmationMethod");
         assert_eq!(serialized, "\"manual\"");
     }
 
@@ -194,11 +194,11 @@ mod payment_intent_tests {
         use serde_json;
         
         let method = CaptureMethod::Automatic;
-        let serialized = serde_json::to_string(&method).unwrap();
+        let serialized = serde_json::to_string(&method).expect("Failed to serialize ConfirmationMethod");
         assert_eq!(serialized, "\"automatic\"");
         
         let method = CaptureMethod::Manual;
-        let serialized = serde_json::to_string(&method).unwrap();
+        let serialized = serde_json::to_string(&method).expect("Failed to serialize ConfirmationMethod");
         assert_eq!(serialized, "\"manual\"");
     }
 
@@ -207,11 +207,11 @@ mod payment_intent_tests {
         use serde_json;
         
         let usage = SetupFutureUsage::OnSession;
-        let serialized = serde_json::to_string(&usage).unwrap();
+        let serialized = serde_json::to_string(&usage).expect("Failed to serialize SetupFutureUsage");
         assert_eq!(serialized, "\"on_session\"");
         
         let usage = SetupFutureUsage::OffSession;
-        let serialized = serde_json::to_string(&usage).unwrap();
+        let serialized = serde_json::to_string(&usage).expect("Failed to serialize SetupFutureUsage");
         assert_eq!(serialized, "\"off_session\"");
     }
 
@@ -223,7 +223,7 @@ mod payment_intent_tests {
         };
         
         assert!(apm.enabled);
-        assert_eq!(apm.allow_redirects.unwrap(), "never");
+        assert_eq!(apm.allow_redirects.as_deref(), Some("never"));
     }
 
     #[test]
