@@ -459,17 +459,26 @@ impl PaymentProvider for PayPalProvider {
         ))
     }
 
-    async fn verify_webhook(&self, _payload: &[u8], _signature: &str, _secret: &str) -> Result<bool> {
-        // TODO: Implement webhook verification once PayPalWebhookHandler is available
-        // use super::webhooks::PayPalWebhookHandler;
-        // 
-        // let handler = PayPalWebhookHandler::new(secret.to_string());
-        // Ok(handler.verify_signature(
-        //     std::str::from_utf8(payload).map_err(|e| 
-        //         PayupError::ValidationError(format!("Invalid UTF-8 in webhook payload: {}", e))
-        //     )?,
-        //     signature
-        // ))
-        Ok(false)
+    async fn verify_webhook(&self, payload: &[u8], signature: &str, secret: &str) -> Result<bool> {
+        use super::webhooks::WebhookEvent;
+        use std::collections::HashMap;
+        
+        // PayPal webhook verification requires the webhook_id and headers
+        // The signature parameter should contain a JSON-encoded map of headers
+        // Parse the signature parameter which should contain the headers as JSON
+        let headers: HashMap<String, String> = serde_json::from_str(signature)
+            .map_err(|e| PayupError::ValidationError(
+                format!("Expected signature parameter to be JSON-encoded headers: {}", e)
+            ))?;
+        
+        // Convert payload to string
+        let body = std::str::from_utf8(payload)
+            .map_err(|e| PayupError::ValidationError(
+                format!("Invalid UTF-8 in webhook payload: {}", e)
+            ))?;
+        
+        // The secret parameter is the webhook_id from PayPal
+        let mut client = self.client.lock().await;
+        WebhookEvent::async_verify(&mut *client, headers, body, secret).await
     }
 }
