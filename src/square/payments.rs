@@ -155,6 +155,17 @@ impl Payment {
         }
         client.get(&endpoint)
     }
+    
+    pub async fn async_list(client: &SquareClient, location_id: Option<&str>, limit: Option<i32>) -> Result<Vec<Self>> {
+        let mut endpoint = String::from("/v2/payments?");
+        if let Some(loc) = location_id {
+            endpoint.push_str(&format!("location_id={}&", loc));
+        }
+        if let Some(lim) = limit {
+            endpoint.push_str(&format!("limit={}", lim));
+        }
+        client.async_get(&endpoint).await
+    }
 }
 
 impl Refund {
@@ -185,6 +196,17 @@ impl Refund {
             endpoint.push_str(&format!("limit={}", lim));
         }
         client.get(&endpoint)
+    }
+    
+    pub async fn async_list(client: &SquareClient, location_id: Option<&str>, limit: Option<i32>) -> Result<Vec<Self>> {
+        let mut endpoint = String::from("/v2/refunds?");
+        if let Some(loc) = location_id {
+            endpoint.push_str(&format!("location_id={}&", loc));
+        }
+        if let Some(lim) = limit {
+            endpoint.push_str(&format!("limit={}", lim));
+        }
+        client.async_get(&endpoint).await
     }
 }
 

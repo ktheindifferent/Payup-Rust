@@ -159,10 +159,20 @@ impl Customer {
         let endpoint = format!("/v2/customers/{}", customer_id);
         client.put(&endpoint, request)
     }
+    
+    pub async fn async_update(client: &SquareClient, customer_id: &str, request: &UpdateCustomerRequest) -> Result<Self> {
+        let endpoint = format!("/v2/customers/{}", customer_id);
+        client.async_put(&endpoint, request).await
+    }
 
     pub fn delete(client: &SquareClient, customer_id: &str) -> Result<bool> {
         let endpoint = format!("/v2/customers/{}", customer_id);
         client.delete(&endpoint)
+    }
+    
+    pub async fn async_delete(client: &SquareClient, customer_id: &str) -> Result<bool> {
+        let endpoint = format!("/v2/customers/{}", customer_id);
+        client.async_delete(&endpoint).await
     }
 
     pub fn list(client: &SquareClient, cursor: Option<&str>, limit: Option<i32>) -> Result<Vec<Self>> {
@@ -174,6 +184,17 @@ impl Customer {
             endpoint.push_str(&format!("limit={}", l));
         }
         client.get(&endpoint)
+    }
+    
+    pub async fn async_list(client: &SquareClient, cursor: Option<&str>, limit: Option<i32>) -> Result<Vec<Self>> {
+        let mut endpoint = String::from("/v2/customers?");
+        if let Some(c) = cursor {
+            endpoint.push_str(&format!("cursor={}&", c));
+        }
+        if let Some(l) = limit {
+            endpoint.push_str(&format!("limit={}", l));
+        }
+        client.async_get(&endpoint).await
     }
 
     pub fn search(client: &SquareClient, request: &SearchCustomersRequest) -> Result<Vec<Self>> {
