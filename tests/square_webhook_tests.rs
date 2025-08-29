@@ -21,7 +21,8 @@ fn generate_signature(url: &str, payload: &str, key: &str) -> String {
     let data_to_sign = format!("{}{}", url, payload);
     type HmacSha256 = Hmac<Sha256>;
     
-    let mut mac = HmacSha256::new_from_slice(key.as_bytes()).unwrap();
+    let mut mac = HmacSha256::new_from_slice(key.as_bytes())
+        .expect("Failed to create HMAC instance");
     mac.update(data_to_sign.as_bytes());
     let result = mac.finalize();
     
@@ -151,7 +152,7 @@ fn test_webhook_event_parsing() {
         }
     }"#;
     
-    let event = WebhookEvent::parse(event_json).unwrap();
+    let event = WebhookEvent::parse(event_json).expect("Failed to parse webhook event");
     
     assert_eq!(event.get_merchant_id(), "MERCHANT_ABC");
     assert_eq!(event.get_location_id(), Some("LOC_123"));
@@ -160,7 +161,8 @@ fn test_webhook_event_parsing() {
     assert_eq!(event.event_type_enum(), WebhookEventType::PaymentCreated);
     
     // Test resource extraction
-    let resource: serde_json::Value = event.get_resource().unwrap();
+    let resource: serde_json::Value = event.get_resource()
+        .expect("Event should have resource data");
     assert_eq!(resource["id"], "PAYMENT_XYZ");
     assert_eq!(resource["amount_money"]["amount"], 2500);
 }
@@ -203,21 +205,21 @@ fn test_webhook_event_handler() {
     
     let payment_created_clone = payment_created.clone();
     handler.on("payment.created", move |event| {
-        *payment_created_clone.lock().unwrap() = true;
+        *payment_created_clone.lock().expect("Failed to lock payment_created") = true;
         assert_eq!(event.event_type, "payment.created");
         Ok(())
     });
     
     let refund_created_clone = refund_created.clone();
     handler.on("refund.created", move |event| {
-        *refund_created_clone.lock().unwrap() = true;
+        *refund_created_clone.lock().expect("Failed to lock refund_created") = true;
         assert_eq!(event.event_type, "refund.created");
         Ok(())
     });
     
     let default_called_clone = default_called.clone();
     handler.default(move |event| {
-        *default_called_clone.lock().unwrap() = true;
+        *default_called_clone.lock().expect("Failed to lock default_called") = true;
         println!("Default handler called for event: {}", event.event_type);
         Ok(())
     });
@@ -242,10 +244,10 @@ fn test_webhook_event_handler() {
         },
     };
     
-    handler.handle(&payment_event).unwrap();
-    assert!(*payment_created.lock().unwrap());
-    assert!(!*refund_created.lock().unwrap());
-    assert!(!*default_called.lock().unwrap());
+    handler.handle(&payment_event).expect("Failed to handle payment event");
+    assert!(*payment_created.lock().expect("Failed to lock payment_created"));
+    assert!(!*refund_created.lock().expect("Failed to lock refund_created"));
+    assert!(!*default_called.lock().expect("Failed to lock default_called"));
     
     // Test refund.created event
     let refund_event = WebhookEvent {
@@ -267,13 +269,13 @@ fn test_webhook_event_handler() {
         },
     };
     
-    handler.handle(&refund_event).unwrap();
-    assert!(*refund_created.lock().unwrap());
+    handler.handle(&refund_event).expect("Failed to handle refund event");
+    assert!(*refund_created.lock().expect("Failed to lock refund_created"));
     
     // Reset flags
-    *payment_created.lock().unwrap() = false;
-    *refund_created.lock().unwrap() = false;
-    *default_called.lock().unwrap() = false;
+    *payment_created.lock().expect("Failed to lock payment_created") = false;
+    *refund_created.lock().expect("Failed to lock refund_created") = false;
+    *default_called.lock().expect("Failed to lock default_called") = false;
     
     // Test unknown event (should trigger default handler)
     let unknown_event = WebhookEvent {
@@ -290,10 +292,10 @@ fn test_webhook_event_handler() {
         },
     };
     
-    handler.handle(&unknown_event).unwrap();
-    assert!(!*payment_created.lock().unwrap());
-    assert!(!*refund_created.lock().unwrap());
-    assert!(*default_called.lock().unwrap());
+    handler.handle(&unknown_event).expect("Failed to handle unknown event");
+    assert!(!*payment_created.lock().expect("Failed to lock payment_created"));
+    assert!(!*refund_created.lock().expect("Failed to lock refund_created"));
+    assert!(*default_called.lock().expect("Failed to lock default_called"));
 }
 
 #[test]
@@ -334,13 +336,15 @@ fn test_construct_event() {
     let payload_str = event_json.to_string();
     let signature = generate_signature(TEST_WEBHOOK_URL, &payload_str, TEST_SIGNATURE_KEY);
     
-    let event = handler.construct_event(&payload_str, &signature, TEST_WEBHOOK_URL).unwrap();
+    let event = handler.construct_event(&payload_str, &signature, TEST_WEBHOOK_URL)
+        .expect("Failed to construct event");
     
     assert_eq!(event.get_merchant_id(), "MERCHANT_TEST");
     assert_eq!(event.get_location_id(), Some("LOC_TEST"));
     assert_eq!(event.event_type_enum(), WebhookEventType::OrderCreated);
     
-    let resource: serde_json::Value = event.get_resource().unwrap();
+    let resource: serde_json::Value = event.get_resource()
+        .expect("Event should have resource data");
     assert_eq!(resource["state"], "OPEN");
     assert_eq!(resource["total_money"]["amount"], 3000);
 }
@@ -353,7 +357,7 @@ async fn test_async_event_handling() {
     let handled_clone = handled.clone();
     
     handler.on("payment.created", move |_event| {
-        *handled_clone.lock().unwrap() = true;
+        *handled_clone.lock().expect("Failed to lock handled") = true;
         Ok(())
     });
     
@@ -371,8 +375,8 @@ async fn test_async_event_handling() {
         },
     };
     
-    handler.handle_async(&event).await.unwrap();
-    assert!(*handled.lock().unwrap());
+    handler.handle_async(&event).await.expect("Failed to handle async event");
+    assert!(*handled.lock().expect("Failed to lock handled"));
 }
 
 #[test]
@@ -393,7 +397,8 @@ fn test_multiple_event_types_registration() {
     for event_type in events {
         let events_handled_clone = events_handled.clone();
         handler.on_event(event_type.clone(), move |event| {
-            events_handled_clone.lock().unwrap().push(event.event_type.clone());
+            events_handled_clone.lock().expect("Failed to lock events_handled")
+                .push(event.event_type.clone());
             Ok(())
         });
     }
@@ -414,16 +419,17 @@ fn test_multiple_event_types_registration() {
             event_id: format!("evt_{}", entity_id),
             created_at: chrono::Utc::now().to_rfc3339(),
             data: payup::square::webhooks::WebhookEventData {
-                data_type: event_type.split('.').next().unwrap().to_string(),
+                data_type: event_type.split('.').next()
+                    .expect("Event type should have at least one part").to_string(),
                 id: entity_id.to_string(),
                 object: json!({}),
             },
         };
         
-        handler.handle(&event).unwrap();
+        handler.handle(&event).expect("Failed to handle event in batch test");
     }
     
-    let handled = events_handled.lock().unwrap();
+    let handled = events_handled.lock().expect("Failed to lock events_handled");
     assert_eq!(handled.len(), 3);
     assert!(handled.contains(&"payment.created".to_string()));
     assert!(handled.contains(&"refund.created".to_string()));

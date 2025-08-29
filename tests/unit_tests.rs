@@ -52,9 +52,9 @@ mod customer_tests {
         customer.email = Some("john@example.com".to_string());
         customer.phone = Some("123-456-7890".to_string());
         
-        assert_eq!(customer.name.unwrap(), "John Doe");
-        assert_eq!(customer.email.unwrap(), "john@example.com");
-        assert_eq!(customer.phone.unwrap(), "123-456-7890");
+        assert_eq!(customer.name.as_deref(), Some("John Doe"));
+        assert_eq!(customer.email.as_deref(), Some("john@example.com"));
+        assert_eq!(customer.phone.as_deref(), Some("123-456-7890"));
     }
 }
 
@@ -77,8 +77,8 @@ mod charge_tests {
         charge.amount = Some("1000".to_string());
         charge.currency = Some("usd".to_string());
         
-        assert_eq!(charge.amount.unwrap(), "1000");
-        assert_eq!(charge.currency.unwrap(), "usd");
+        assert_eq!(charge.amount.as_deref(), Some("1000"));
+        assert_eq!(charge.currency.as_deref(), Some("usd"));
     }
 }
 
@@ -103,10 +103,10 @@ mod card_tests {
         card.exp_year = Some("2025".to_string());
         card.cvc = Some("123".to_string());
         
-        assert_eq!(card.number.unwrap(), "4242424242424242");
-        assert_eq!(card.exp_month.unwrap(), "12");
-        assert_eq!(card.exp_year.unwrap(), "2025");
-        assert_eq!(card.cvc.unwrap(), "123");
+        assert_eq!(card.number.as_deref(), Some("4242424242424242"));
+        assert_eq!(card.exp_month.as_deref(), Some("12"));
+        assert_eq!(card.exp_year.as_deref(), Some("2025"));
+        assert_eq!(card.cvc.as_deref(), Some("123"));
     }
 }
 
@@ -131,7 +131,7 @@ mod payment_method_tests {
         card.number = Some("4242424242424242".to_string());
         pm.card = Some(card);
         
-        assert_eq!(pm.method_type.unwrap(), "card");
+        assert_eq!(pm.method_type.as_deref(), Some("card"));
         assert!(pm.card.is_some());
     }
 }
@@ -154,8 +154,8 @@ mod subscription_tests {
         sub.customer = Some("cus_123".to_string());
         sub.status = Some("active".to_string());
         
-        assert_eq!(sub.customer.unwrap(), "cus_123");
-        assert_eq!(sub.status.unwrap(), "active");
+        assert_eq!(sub.customer.as_deref(), Some("cus_123"));
+        assert_eq!(sub.status.as_deref(), Some("active"));
     }
 }
 
@@ -179,9 +179,9 @@ mod plan_tests {
         plan.currency = Some("usd".to_string());
         plan.interval = Some("month".to_string());
         
-        assert_eq!(plan.amount.unwrap(), "999");
-        assert_eq!(plan.currency.unwrap(), "usd");
-        assert_eq!(plan.interval.unwrap(), "month");
+        assert_eq!(plan.amount.as_deref(), Some("999"));
+        assert_eq!(plan.currency.as_deref(), Some("usd"));
+        assert_eq!(plan.interval.as_deref(), Some("month"));
     }
 }
 
@@ -203,8 +203,8 @@ mod invoice_tests {
         invoice.customer = Some("cus_456".to_string());
         invoice.status = Some("paid".to_string());
         
-        assert_eq!(invoice.customer.unwrap(), "cus_456");
-        assert_eq!(invoice.status.unwrap(), "paid");
+        assert_eq!(invoice.customer.as_deref(), Some("cus_456"));
+        assert_eq!(invoice.status.as_deref(), Some("paid"));
     }
 }
 
@@ -218,13 +218,13 @@ mod payment_intent_tests {
         
         // Test serialization/deserialization of status variants
         let status = PaymentIntentStatus::RequiresPaymentMethod;
-        let serialized = serde_json::to_string(&status).unwrap();
+        let serialized = serde_json::to_string(&status).expect("Failed to serialize PaymentIntentStatus");
         assert_eq!(serialized, "\"requires_payment_method\"");
         
-        let deserialized: PaymentIntentStatus = serde_json::from_str(&serialized).unwrap();
+        let deserialized: PaymentIntentStatus = serde_json::from_str(&serialized).expect("Failed to deserialize PaymentIntentStatus");
         match deserialized {
             PaymentIntentStatus::RequiresPaymentMethod => {},
-            _ => panic!("Wrong variant"),
+            _ => assert!(false, "Expected RequiresPaymentMethod variant, got something else"),
         }
     }
 
@@ -256,9 +256,9 @@ mod payment_intent_tests {
         
         assert_eq!(params.amount, 2000);
         assert_eq!(params.currency, "usd");
-        assert_eq!(params.customer.unwrap(), "cus_123");
-        assert_eq!(params.description.unwrap(), "Test payment");
-        assert_eq!(params.receipt_email.unwrap(), "test@example.com");
+        assert_eq!(params.customer.as_deref(), Some("cus_123"));
+        assert_eq!(params.description.as_deref(), Some("Test payment"));
+        assert_eq!(params.receipt_email.as_deref(), Some("test@example.com"));
         assert!(params.automatic_payment_methods.is_some());
         assert!(params.capture_method.is_some());
         assert!(params.confirmation_method.is_some());
@@ -295,8 +295,8 @@ mod payment_intent_tests {
             shipping: None,
         };
         
-        assert_eq!(params.payment_method.unwrap(), "pm_123");
-        assert_eq!(params.return_url.unwrap(), "https://example.com/return");
+        assert_eq!(params.payment_method.as_deref(), Some("pm_123"));
+        assert_eq!(params.return_url.as_deref(), Some("https://example.com/return"));
         assert!(params.setup_future_usage.is_some());
     }
 
@@ -310,10 +310,10 @@ mod payment_intent_tests {
             transfer_data: None,
         };
         
-        assert_eq!(params.amount_to_capture.unwrap(), 1500);
-        assert_eq!(params.application_fee_amount.unwrap(), 100);
-        assert_eq!(params.statement_descriptor.unwrap(), "CAPTURE");
-        assert_eq!(params.statement_descriptor_suffix.unwrap(), "ORDER");
+        assert_eq!(params.amount_to_capture, Some(1500));
+        assert_eq!(params.application_fee_amount, Some(100));
+        assert_eq!(params.statement_descriptor.as_deref(), Some("CAPTURE"));
+        assert_eq!(params.statement_descriptor_suffix.as_deref(), Some("ORDER"));
     }
 
     #[test]
@@ -322,7 +322,7 @@ mod payment_intent_tests {
             cancellation_reason: Some("requested_by_customer".to_string()),
         };
         
-        assert_eq!(params.cancellation_reason.unwrap(), "requested_by_customer");
+        assert_eq!(params.cancellation_reason.as_deref(), Some("requested_by_customer"));
     }
 
     #[test]
@@ -336,12 +336,12 @@ mod payment_intent_tests {
             state: Some("CA".to_string()),
         };
         
-        assert_eq!(address.city.unwrap(), "San Francisco");
-        assert_eq!(address.country.unwrap(), "US");
-        assert_eq!(address.line1.unwrap(), "123 Main St");
-        assert_eq!(address.line2.unwrap(), "Apt 1");
-        assert_eq!(address.postal_code.unwrap(), "94102");
-        assert_eq!(address.state.unwrap(), "CA");
+        assert_eq!(address.city.as_deref(), Some("San Francisco"));
+        assert_eq!(address.country.as_deref(), Some("US"));
+        assert_eq!(address.line1.as_deref(), Some("123 Main St"));
+        assert_eq!(address.line2.as_deref(), Some("Apt 1"));
+        assert_eq!(address.postal_code.as_deref(), Some("94102"));
+        assert_eq!(address.state.as_deref(), Some("CA"));
     }
 
     #[test]
@@ -362,10 +362,10 @@ mod payment_intent_tests {
         };
         
         assert!(shipping.address.is_some());
-        assert_eq!(shipping.carrier.unwrap(), "FedEx");
-        assert_eq!(shipping.name.unwrap(), "John Doe");
-        assert_eq!(shipping.phone.unwrap(), "+1-555-123-4567");
-        assert_eq!(shipping.tracking_number.unwrap(), "123456789");
+        assert_eq!(shipping.carrier.as_deref(), Some("FedEx"));
+        assert_eq!(shipping.name.as_deref(), Some("John Doe"));
+        assert_eq!(shipping.phone.as_deref(), Some("+1-555-123-4567"));
+        assert_eq!(shipping.tracking_number.as_deref(), Some("123456789"));
     }
 
     #[test]
@@ -375,7 +375,7 @@ mod payment_intent_tests {
             destination: "acct_123".to_string(),
         };
         
-        assert_eq!(transfer_data.amount.unwrap(), 500);
+        assert_eq!(transfer_data.amount, Some(500));
         assert_eq!(transfer_data.destination, "acct_123");
     }
 }
