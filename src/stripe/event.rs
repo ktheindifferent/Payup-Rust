@@ -1,7 +1,8 @@
+use crate::http_client::get_shared_client;
+use crate::stripe::auth::Auth;
+use crate::stripe::request::parse_async_response;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::stripe::auth::Auth;
-use crate::http_client::get_shared_client;
 
 /// Event data wrapper - contains the actual object that triggered the event
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,10 +26,10 @@ pub struct EventRequest {
 }
 
 /// Events occur when the state of another API resource changes.
-/// 
+///
 /// Stripe uses webhooks to notify your application when an event happens in your account.
-/// Events occur when the state of another API resource changes. For example, a 
-/// charge.succeeded event is created when a charge is successful, and an 
+/// Events occur when the state of another API resource changes. For example, a
+/// charge.succeeded event is created when a charge is successful, and an
 /// invoice.payment_failed event is created when an invoice payment attempt fails.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
@@ -68,7 +69,7 @@ impl Event {
     ///
     /// ```ignore
     /// use payup::stripe::{Auth, Event};
-    /// 
+    ///
     /// let auth = Auth::new("sk_test_...".to_string(), "".to_string());
     /// let event = Event::get(&auth, "evt_1234567890").await?;
     /// println!("Event type: {}", event.type_field);
@@ -77,12 +78,10 @@ impl Event {
         let url = format!("https://api.stripe.com/v1/events/{}", id);
         let response = get_shared_client()
             .get(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()
             .await?;
-        
-        let event = response.json::<Self>().await?;
-        Ok(event)
+        parse_async_response(response).await
     }
 
     /// Lists events, returning the most recent events first
@@ -96,16 +95,19 @@ impl Event {
     ///
     /// ```ignore
     /// use payup::stripe::{Auth, Event};
-    /// 
+    ///
     /// let auth = Auth::new("sk_test_...".to_string(), "".to_string());
     /// let events = Event::list(&auth, None).await?;
     /// for event in events.data {
     ///     println!("Event: {} - {}", event.id, event.type_field);
     /// }
     /// ```
-    pub async fn list(auth: &Auth, params: Option<ListEventsParams>) -> Result<EventList, crate::error::PayupError> {
+    pub async fn list(
+        auth: &Auth,
+        params: Option<ListEventsParams>,
+    ) -> Result<EventList, crate::error::PayupError> {
         let mut url = "https://api.stripe.com/v1/events".to_string();
-        
+
         if let Some(params) = params {
             let query = params.to_query_string();
             if !query.is_empty() {
@@ -113,19 +115,17 @@ impl Event {
                 url.push_str(&query);
             }
         }
-        
+
         let response = get_shared_client()
             .get(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()
             .await?;
-        
-        let events = response.json::<EventList>().await?;
-        Ok(events)
+        parse_async_response(response).await
     }
 
     /// Extracts the typed object from the event data
-    /// 
+    ///
     /// This is a convenience method to deserialize the event's data.object
     /// into a specific Stripe object type.
     ///
@@ -133,7 +133,7 @@ impl Event {
     ///
     /// ```ignore
     /// use payup::stripe::{Event, Charge};
-    /// 
+    ///
     /// let event = Event::get(&auth, "evt_charge_succeeded").await?;
     /// if event.type_field == "charge.succeeded" {
     ///     let charge: Charge = event.extract_object()?;
@@ -145,7 +145,7 @@ impl Event {
         T: for<'de> Deserialize<'de>,
     {
         serde_json::from_value(self.data.object.clone())
-            .map_err(|e| crate::error::PayupError::SerializationError(e.to_string()))
+            .map_err(crate::error::PayupError::SerializationError)
     }
 
     /// Gets the previous attributes for update events
@@ -159,7 +159,7 @@ impl Event {
         match &self.data.previous_attributes {
             Some(attrs) => {
                 let result = serde_json::from_value(attrs.clone())
-                    .map_err(|e| crate::error::PayupError::SerializationError(e.to_string()))?;
+                    .map_err(crate::error::PayupError::SerializationError)?;
                 Ok(Some(result))
             }
             None => Ok(None),
@@ -203,37 +203,37 @@ impl ListEventsParams {
     /// Converts parameters to query string
     pub fn to_query_string(&self) -> String {
         let mut params = Vec::new();
-        
+
         if let Some(ref created) = self.created {
             params.push(format!("created={}", created.to_query_string()));
         }
-        
+
         if let Some(delivery_success) = self.delivery_success {
             params.push(format!("delivery_success={}", delivery_success));
         }
-        
+
         if let Some(ref ending_before) = self.ending_before {
             params.push(format!("ending_before={}", ending_before));
         }
-        
+
         if let Some(limit) = self.limit {
             params.push(format!("limit={}", limit));
         }
-        
+
         if let Some(ref starting_after) = self.starting_after {
             params.push(format!("starting_after={}", starting_after));
         }
-        
+
         if let Some(ref type_field) = self.type_field {
             params.push(format!("type={}", type_field));
         }
-        
+
         if let Some(ref types) = self.types {
             for t in types {
                 params.push(format!("types[]={}", t));
             }
         }
-        
+
         params.join("&")
     }
 }
@@ -334,8 +334,10 @@ pub mod event_types {
     pub const CUSTOMER_SUBSCRIPTION_CREATED: &str = "customer.subscription.created";
     pub const CUSTOMER_SUBSCRIPTION_DELETED: &str = "customer.subscription.deleted";
     pub const CUSTOMER_SUBSCRIPTION_PAUSED: &str = "customer.subscription.paused";
-    pub const CUSTOMER_SUBSCRIPTION_PENDING_UPDATE_APPLIED: &str = "customer.subscription.pending_update_applied";
-    pub const CUSTOMER_SUBSCRIPTION_PENDING_UPDATE_EXPIRED: &str = "customer.subscription.pending_update_expired";
+    pub const CUSTOMER_SUBSCRIPTION_PENDING_UPDATE_APPLIED: &str =
+        "customer.subscription.pending_update_applied";
+    pub const CUSTOMER_SUBSCRIPTION_PENDING_UPDATE_EXPIRED: &str =
+        "customer.subscription.pending_update_expired";
     pub const CUSTOMER_SUBSCRIPTION_RESUMED: &str = "customer.subscription.resumed";
     pub const CUSTOMER_SUBSCRIPTION_TRIAL_WILL_END: &str = "customer.subscription.trial_will_end";
     pub const CUSTOMER_SUBSCRIPTION_UPDATED: &str = "customer.subscription.updated";
@@ -359,7 +361,8 @@ pub mod event_types {
     pub const INVOICE_VOIDED: &str = "invoice.voided";
 
     // Payment Intent events
-    pub const PAYMENT_INTENT_AMOUNT_CAPTURABLE_UPDATED: &str = "payment_intent.amount_capturable_updated";
+    pub const PAYMENT_INTENT_AMOUNT_CAPTURABLE_UPDATED: &str =
+        "payment_intent.amount_capturable_updated";
     pub const PAYMENT_INTENT_CANCELED: &str = "payment_intent.canceled";
     pub const PAYMENT_INTENT_CREATED: &str = "payment_intent.created";
     pub const PAYMENT_INTENT_PARTIALLY_FUNDED: &str = "payment_intent.partially_funded";

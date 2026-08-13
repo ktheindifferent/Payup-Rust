@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+use crate::error::Result;
+use crate::http_client::get_shared_client;
 use crate::stripe::auth::Auth;
-use crate::http_client::{get_shared_client, get_shared_blocking_client};
+use crate::stripe::request::{idempotent_request, parse_async_response, IdempotencyKey};
 
 /// Represents a customer of your business.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -87,17 +89,17 @@ impl Customer {
     /// // Fetch customer using id
     /// let customer = payup::stripe::Customer::async_delete(auth, "cust_test123".to_string()).await?;
     /// ```ignore
-    pub async fn async_delete(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
+    pub async fn async_delete(creds: Auth, id: String) -> Result<Self> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
 
         let request = get_shared_client()
             .delete(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let request = idempotent_request(request, &IdempotencyKey::generate())
             .send()
             .await?;
 
-        let json = request.json::<Self>().await?;
-        Ok(json)
+        parse_async_response(request).await
     }
 
     /// Asynchronously lookup a stripe Customer using customer_id
@@ -116,15 +118,14 @@ impl Customer {
     /// // Fetch customer using id
     /// let customer = payup::stripe::Customer::async_get(auth, "cust_test123".to_string()).await?;
     /// ```ignore
-    pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
+    pub async fn async_get(creds: Auth, id: String) -> Result<Self> {
         let url = format!("https://api.stripe.com/v1/customers/{}", id);
         let request = get_shared_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()
             .await?;
-        let json = request.json::<Self>().await?;
-        Ok(json)
+        parse_async_response(request).await
     }
 
     /// Asynchronously returns all Invoices belonging to the customer_id
@@ -145,22 +146,27 @@ impl Customer {
     pub async fn async_invoices(
         creds: Auth,
         customer_id: String,
-    ) -> Result<Vec<crate::stripe::response::Invoice>, reqwest::Error> {
+    ) -> Result<Vec<crate::stripe::response::Invoice>> {
         let mut objects: Vec<crate::stripe::response::Invoice> = Vec::new();
 
         let mut has_more = true;
         let mut starting_after: Option<String> = None;
         while has_more {
-            let json = Self::get_invoices_chunk(
+            let json = Self::get_invoices_chunk_async(
                 creds.clone(),
                 customer_id.clone(),
                 starting_after.clone(),
-            )?;
+            )
+            .await?;
             for json_object in json.data {
                 objects.push(json_object);
             }
             has_more = json.has_more;
-            starting_after = Some(objects[objects.len() - 1].id.clone());
+            if let Some(last) = objects.last() {
+                starting_after = Some(last.id.clone());
+            } else {
+                break;
+            }
         }
         Ok(objects)
     }
@@ -180,7 +186,7 @@ impl Customer {
     /// // Fetch all customers from stripe
     /// let customers = payup::stripe::Customer::async_list(auth).await?;
     /// ```ignore
-    pub async fn async_list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
+    pub async fn async_list(creds: Auth) -> Result<Vec<Self>> {
         let mut objects = Vec::new();
         let mut has_more = true;
         let mut starting_after = None;
@@ -218,7 +224,7 @@ impl Customer {
         creds: Auth,
         customer_id: String,
         method_type: String,
-    ) -> Result<Vec<crate::stripe::response::PaymentMethod>, reqwest::Error> {
+    ) -> Result<Vec<crate::stripe::response::PaymentMethod>> {
         let mut objects: Vec<crate::stripe::response::PaymentMethod> = Vec::new();
 
         let mut has_more = true;
@@ -235,7 +241,11 @@ impl Customer {
                 objects.push(json_object);
             }
             has_more = json.has_more;
-            starting_after = Some(objects[objects.len() - 1].id.clone());
+            if let Some(last) = objects.last() {
+                starting_after = Some(last.id.clone());
+            } else {
+                break;
+            }
         }
         Ok(objects)
     }
@@ -263,21 +273,15 @@ impl Customer {
     /// // Post customer to stripe and update the local cust variable
     /// let customer = cust.async_post(auth).await?;
     /// ```ignore
-    pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+    pub async fn async_post(&self, creds: Auth) -> Result<Self> {
         let request = get_shared_client()
             .post("https://api.stripe.com/v1/customers")
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .form(&self.to_params())
             .send()
-            .await;
-        match request {
-            Ok(req) => {
-                let json = req.json::<Self>().await?;
-
-                Ok(json)
-            }
-            Err(err) => Err(err),
-        }
+            .await?;
+        parse_async_response(response).await
     }
 
     /// Asynchronously POSTs updates to an existing stripe Customer
@@ -309,29 +313,32 @@ impl Customer {
     /// // Update customer
     /// customer = cust.async_update(auth).await?;
     /// ```ignore
-    pub async fn async_update(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
+    pub async fn async_update(&self, creds: Auth) -> Result<Self> {
         let request = get_shared_client()
             .post(format!(
                 "https://api.stripe.com/v1/customers/{}",
-                self.clone().id.ok_or_else(|| crate::error::PayupError::ValidationError("Customer ID is required for update".to_string()))?
+                self.clone()
+                    .id
+                    .ok_or_else(|| crate::error::PayupError::ValidationError(
+                        "Customer ID is required for update".to_string()
+                    ))?
             ))
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .form(&self.to_params())
             .send()
             .await?;
-
-        let json = request.json::<Self>().await?;
-        Ok(json)
+        parse_async_response(response).await
     }
 
     // ... Other methods (synchronous versions) for brevity
     // The full implementation would include all the synchronous methods as well
 
-    fn get_invoices_chunk(
+    async fn get_invoices_chunk_async(
         creds: Auth,
         customer_id: String,
         starting_after: Option<String>,
-    ) -> Result<crate::stripe::response::Invoices, reqwest::Error> {
+    ) -> Result<crate::stripe::response::Invoices> {
         let url = if let Some(ref after) = starting_after {
             format!(
                 "https://api.stripe.com/v1/invoices?customer={}&starting_after={}",
@@ -344,19 +351,19 @@ impl Customer {
             )
         };
 
-        let request = get_shared_blocking_client()
+        let request = get_shared_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
-            .send()?;
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
+            .send()
+            .await?;
 
-        let json = request.json::<crate::stripe::response::Invoices>()?;
-        Ok(json)
+        parse_async_response(request).await
     }
 
     async fn list_chunk_async(
         creds: Auth,
         starting_after: Option<String>,
-    ) -> Result<Customers, reqwest::Error> {
+    ) -> Result<Customers> {
         let mut url = "https://api.stripe.com/v1/customers".to_string();
 
         if let Some(ref after) = starting_after {
@@ -368,12 +375,11 @@ impl Customer {
 
         let request = get_shared_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()
             .await?;
 
-        let json = request.json::<Customers>().await?;
-        Ok(json)
+        parse_async_response(request).await
     }
 
     async fn get_payment_methods_chunk_async(
@@ -381,7 +387,7 @@ impl Customer {
         customer_id: String,
         method_type: String,
         starting_after: Option<String>,
-    ) -> Result<crate::stripe::response::PaymentMethods, reqwest::Error> {
+    ) -> Result<crate::stripe::response::PaymentMethods> {
         let url = if let Some(ref after) = starting_after {
             format!(
                 "https://api.stripe.com/v1/customers/{}/payment_methods?type={}&starting_after={}",
@@ -396,14 +402,11 @@ impl Customer {
 
         let request = get_shared_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()
             .await?;
 
-        let json = request
-            .json::<crate::stripe::response::PaymentMethods>()
-            .await?;
-        Ok(json)
+        parse_async_response(request).await
     }
 
     fn to_params(&self) -> Vec<(&str, &str)> {

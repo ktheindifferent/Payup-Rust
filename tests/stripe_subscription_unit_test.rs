@@ -26,6 +26,7 @@ mod tests {
         let mut sub = Subscription::new();
         sub.customer = Some("cus_test123".to_string());
         sub.price_items = Some(vec!["price_test123".to_string()]);
+        sub.subscription_item_ids = Some(vec!["si_test123".to_string()]);
         sub.default_payment_method = Some("pm_test123".to_string());
         sub.collection_method = Some("charge_automatically".to_string());
         sub.cancel_at_period_end = Some(true);
@@ -40,6 +41,7 @@ mod tests {
         assert!(params.iter().any(|(k, v)| *k == "cancel_at_period_end" && v == "true"));
         assert!(params.iter().any(|(k, v)| *k == "days_until_due" && v == "7"));
         assert!(params.iter().any(|(k, v)| k.starts_with("items[0][price]") && v == "price_test123"));
+        assert!(params.iter().any(|(k, v)| *k == "items[0][id]" && v == "si_test123"));
     }
     
     #[test]

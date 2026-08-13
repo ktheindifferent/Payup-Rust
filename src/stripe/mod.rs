@@ -1,6 +1,7 @@
 pub mod response;
 pub mod webhooks;
 pub mod provider;
+pub mod request;
 
 // Core modules
 pub mod account;
@@ -46,6 +47,7 @@ pub use subscription::Subscription;
 pub use transfer::{Transfer, TransferReversal, TransferReversalList, CreateTransferParams, UpdateTransferParams, CreateReversalParams};
 pub use webhooks::{StripeWebhookHandler, WebhookEvent, WebhookEventType, WebhookEventData, WebhookRequest};
 pub use provider::StripeProvider;
+pub use request::{IdempotencyKey, IDEMPOTENCY_KEY_HEADER};
 pub use builders::{
     ChargeBuilder, ShippingBuilder, ShippingAddressBuilder,
     PaymentIntentBuilder, InvoiceBuilder, PlanBuilder, PriceBuilder

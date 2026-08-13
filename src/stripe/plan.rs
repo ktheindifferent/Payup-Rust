@@ -1,11 +1,27 @@
+use crate::http_client::get_shared_client;
+use crate::stripe::auth::Auth;
+use crate::stripe::request::{idempotent_request, parse_async_response, IdempotencyKey};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::stripe::auth::Auth;
-use crate::http_client::{get_shared_client, get_shared_blocking_client};
+
+async fn post_stripe<T, P>(auth: &Auth, url: &str, params: &P) -> crate::error::Result<T>
+where
+    T: serde::de::DeserializeOwned,
+    P: Serialize + ?Sized,
+{
+    let request = get_shared_client()
+        .post(url)
+        .header("Authorization", format!("Bearer {}", auth.api_key()));
+    let response = idempotent_request(request, &IdempotencyKey::generate())
+        .form(params)
+        .send()
+        .await?;
+    parse_async_response(response).await
+}
 
 /// Represents a subscription plan
-/// 
-/// Plans define the base price, currency, and billing cycle for recurring purchases 
+///
+/// Plans define the base price, currency, and billing cycle for recurring purchases
 /// of products. Products help you track inventory or provisioning, and plans help you track pricing.
 /// Note: The Plan API is deprecated - use the Prices API instead.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,8 +79,8 @@ pub struct Plan {
 }
 
 /// Represents a price object
-/// 
-/// Prices define the unit cost, currency, and (optional) billing cycle for both 
+///
+/// Prices define the unit cost, currency, and (optional) billing cycle for both
 /// recurring and one-time purchases of products.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Price {
@@ -128,7 +144,7 @@ pub enum BillingScheme {
 }
 
 /// Billing interval
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Interval {
     Day,
@@ -172,7 +188,7 @@ pub enum PriceType {
 }
 
 /// Tax behavior
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaxBehavior {
     Exclusive,
@@ -266,17 +282,12 @@ pub struct PriceTier {
 
 impl Plan {
     /// Creates a new plan
-    pub async fn create(auth: &Auth, params: CreatePlanParams) -> Result<Self, crate::error::PayupError> {
+    pub async fn create(
+        auth: &Auth,
+        params: CreatePlanParams,
+    ) -> Result<Self, crate::error::PayupError> {
         let url = "https://api.stripe.com/v1/plans";
-        let response = get_shared_client()
-            .post(url)
-            .basic_auth(&auth.client, Some(&auth.secret))
-            .form(&params)
-            .send()
-            .await?;
-        
-        let plan = response.json::<Self>().await?;
-        Ok(plan)
+        post_stripe(auth, url, &params).await
     }
 
     /// Retrieves a plan by ID
@@ -284,39 +295,32 @@ impl Plan {
         let url = format!("https://api.stripe.com/v1/plans/{}", id);
         let response = get_shared_client()
             .get(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()
             .await?;
-        
-        let plan = response.json::<Self>().await?;
-        Ok(plan)
+        parse_async_response(response).await
     }
 
     /// Updates a plan
-    pub async fn update(auth: &Auth, id: &str, params: UpdatePlanParams) -> Result<Self, crate::error::PayupError> {
+    pub async fn update(
+        auth: &Auth,
+        id: &str,
+        params: UpdatePlanParams,
+    ) -> Result<Self, crate::error::PayupError> {
         let url = format!("https://api.stripe.com/v1/plans/{}", id);
-        let response = get_shared_client()
-            .post(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
-            .form(&params)
-            .send()
-            .await?;
-        
-        let plan = response.json::<Self>().await?;
-        Ok(plan)
+        post_stripe(auth, &url, &params).await
     }
 
     /// Deletes a plan
     pub async fn delete(auth: &Auth, id: &str) -> Result<DeletedPlan, crate::error::PayupError> {
         let url = format!("https://api.stripe.com/v1/plans/{}", id);
-        let response = get_shared_client()
+        let request = get_shared_client()
             .delete(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .send()
             .await?;
-        
-        let result = response.json::<DeletedPlan>().await?;
-        Ok(result)
+        parse_async_response(response).await
     }
 
     /// Lists all plans
@@ -324,28 +328,21 @@ impl Plan {
         let url = "https://api.stripe.com/v1/plans";
         let response = get_shared_client()
             .get(url)
-            .basic_auth(&auth.client, Some(&auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()
             .await?;
-        
-        let plans = response.json::<PlanList>().await?;
-        Ok(plans)
+        parse_async_response(response).await
     }
 }
 
 impl Price {
     /// Creates a new price
-    pub async fn create(auth: &Auth, params: CreatePriceParams) -> Result<Self, crate::error::PayupError> {
+    pub async fn create(
+        auth: &Auth,
+        params: CreatePriceParams,
+    ) -> Result<Self, crate::error::PayupError> {
         let url = "https://api.stripe.com/v1/prices";
-        let response = get_shared_client()
-            .post(url)
-            .basic_auth(&auth.client, Some(&auth.secret))
-            .form(&params)
-            .send()
-            .await?;
-        
-        let price = response.json::<Self>().await?;
-        Ok(price)
+        post_stripe(auth, url, &params).await
     }
 
     /// Retrieves a price by ID
@@ -353,26 +350,20 @@ impl Price {
         let url = format!("https://api.stripe.com/v1/prices/{}", id);
         let response = get_shared_client()
             .get(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()
             .await?;
-        
-        let price = response.json::<Self>().await?;
-        Ok(price)
+        parse_async_response(response).await
     }
 
     /// Updates a price
-    pub async fn update(auth: &Auth, id: &str, params: UpdatePriceParams) -> Result<Self, crate::error::PayupError> {
+    pub async fn update(
+        auth: &Auth,
+        id: &str,
+        params: UpdatePriceParams,
+    ) -> Result<Self, crate::error::PayupError> {
         let url = format!("https://api.stripe.com/v1/prices/{}", id);
-        let response = get_shared_client()
-            .post(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
-            .form(&params)
-            .send()
-            .await?;
-        
-        let price = response.json::<Self>().await?;
-        Ok(price)
+        post_stripe(auth, &url, &params).await
     }
 
     /// Lists all prices
@@ -380,25 +371,27 @@ impl Price {
         let url = "https://api.stripe.com/v1/prices";
         let response = get_shared_client()
             .get(url)
-            .basic_auth(&auth.client, Some(&auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()
             .await?;
-        
-        let prices = response.json::<PriceList>().await?;
-        Ok(prices)
+        parse_async_response(response).await
     }
 
     /// Searches for prices
-    pub async fn search(auth: &Auth, query: &str) -> Result<PriceSearchResult, crate::error::PayupError> {
-        let url = format!("https://api.stripe.com/v1/prices/search?query={}", urlencoding::encode(query));
+    pub async fn search(
+        auth: &Auth,
+        query: &str,
+    ) -> Result<PriceSearchResult, crate::error::PayupError> {
+        let url = format!(
+            "https://api.stripe.com/v1/prices/search?query={}",
+            urlencoding::encode(query)
+        );
         let response = get_shared_client()
             .get(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()
             .await?;
-        
-        let result = response.json::<PriceSearchResult>().await?;
-        Ok(result)
+        parse_async_response(response).await
     }
 }
 

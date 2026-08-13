@@ -1,8 +1,64 @@
-use serde::{Deserialize, Serialize};
-use crate::error::Result;
-use crate::rate_limiter::get_rate_limiter;
+use super::request::{
+    idempotent_blocking_request, idempotent_request, parse_async_response, parse_blocking_response,
+    IdempotencyKey,
+};
 use super::Auth;
+use crate::error::Result;
+use crate::http_client::{get_shared_blocking_client, get_shared_client};
+use crate::rate_limiter::get_rate_limiter;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+fn post_payment_method<T, P>(
+    auth: &Auth,
+    url: &str,
+    params: &P,
+    idempotency_key: &IdempotencyKey,
+) -> Result<T>
+where
+    T: serde::de::DeserializeOwned,
+    P: Serialize + ?Sized,
+{
+    let request = get_shared_blocking_client()
+        .post(url)
+        .header("Authorization", format!("Bearer {}", auth.api_key()));
+    let response = idempotent_blocking_request(request, idempotency_key)
+        .form(params)
+        .send()?;
+    parse_blocking_response(response)
+}
+
+async fn post_payment_method_async<T, P>(
+    auth: &Auth,
+    url: impl Into<String>,
+    params: P,
+    idempotency_key: IdempotencyKey,
+) -> Result<T>
+where
+    T: serde::de::DeserializeOwned,
+    P: Serialize + Clone,
+{
+    let url = url.into();
+    let secret = auth.api_key().to_string();
+    get_rate_limiter()
+        .execute_with_retry_async("stripe", move || {
+            let url = url.clone();
+            let secret = secret.clone();
+            let params = params.clone();
+            let idempotency_key = idempotency_key.clone();
+            async move {
+                let request = get_shared_client()
+                    .post(&url)
+                    .header("Authorization", format!("Bearer {}", secret));
+                let response = idempotent_request(request, &idempotency_key)
+                    .form(&params)
+                    .send()
+                    .await?;
+                parse_async_response(response).await
+            }
+        })
+        .await
+}
 
 /// Type of payment method
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -321,146 +377,194 @@ impl PaymentMethod {
 
     /// Create a new payment method
     pub fn create(auth: &Auth, params: CreatePaymentMethodParams) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
-        let response = client
-            .post("https://api.stripe.com/v1/payment_methods")
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .form(&params)
-            .send()?;
-        
-        let payment_method: PaymentMethod = response.json()?;
-        Ok(payment_method)
+        Self::create_with_idempotency_key(auth, params, &IdempotencyKey::generate())
+    }
+
+    pub fn create_with_idempotency_key(
+        auth: &Auth,
+        params: CreatePaymentMethodParams,
+        idempotency_key: &IdempotencyKey,
+    ) -> Result<Self> {
+        post_payment_method(
+            auth,
+            "https://api.stripe.com/v1/payment_methods",
+            &params,
+            idempotency_key,
+        )
     }
 
     /// Create a new payment method (async)
     pub async fn create_async(auth: &Auth, params: CreatePaymentMethodParams) -> Result<Self> {
-        let rate_limiter = get_rate_limiter();
-        
-        rate_limiter.execute_with_retry_async("stripe", move || {
-            let params = params.clone();
-            async move {
-                let client = reqwest::Client::new();
-                let response = client
-                    .post("https://api.stripe.com/v1/payment_methods")
-                    .header("Authorization", format!("Bearer {}", auth.secret))
-                    .form(&params)
-                    .send()
-                    .await?;
-                
-                let payment_method: PaymentMethod = response.json().await?;
-                Ok(payment_method)
-            }
-        }).await
+        Self::create_async_with_idempotency_key(auth, params, IdempotencyKey::generate()).await
+    }
+
+    pub async fn create_async_with_idempotency_key(
+        auth: &Auth,
+        params: CreatePaymentMethodParams,
+        idempotency_key: IdempotencyKey,
+    ) -> Result<Self> {
+        post_payment_method_async(
+            auth,
+            "https://api.stripe.com/v1/payment_methods",
+            params,
+            idempotency_key,
+        )
+        .await
     }
 
     /// Retrieve a payment method by ID
     pub fn retrieve(auth: &Auth, payment_method_id: &str) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        let client = get_shared_blocking_client();
         let response = client
-            .get(&format!("https://api.stripe.com/v1/payment_methods/{}", payment_method_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .get(&format!(
+                "https://api.stripe.com/v1/payment_methods/{}",
+                payment_method_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()?;
-        
-        let payment_method: PaymentMethod = response.json()?;
-        Ok(payment_method)
+
+        parse_blocking_response(response)
     }
 
     /// Retrieve a payment method by ID (async)
     pub async fn retrieve_async(auth: &Auth, payment_method_id: &str) -> Result<Self> {
         let rate_limiter = get_rate_limiter();
         let payment_method_id = payment_method_id.to_string();
-        
-        rate_limiter.execute_with_retry_async("stripe", move || {
-            let payment_method_id = payment_method_id.clone();
-            async move {
-                let client = reqwest::Client::new();
-                let response = client
-                    .get(&format!("https://api.stripe.com/v1/payment_methods/{}", payment_method_id))
-                    .header("Authorization", format!("Bearer {}", auth.secret))
-                    .send()
-                    .await?;
-                
-                let payment_method: PaymentMethod = response.json().await?;
-                Ok(payment_method)
-            }
-        }).await
+
+        rate_limiter
+            .execute_with_retry_async("stripe", move || {
+                let payment_method_id = payment_method_id.clone();
+                async move {
+                    let client = get_shared_client();
+                    let response = client
+                        .get(&format!(
+                            "https://api.stripe.com/v1/payment_methods/{}",
+                            payment_method_id
+                        ))
+                        .header("Authorization", format!("Bearer {}", auth.api_key()))
+                        .send()
+                        .await?;
+
+                    parse_async_response(response).await
+                }
+            })
+            .await
     }
 
     /// Attach a payment method to a customer
     pub fn attach(auth: &Auth, payment_method_id: &str, customer_id: &str) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
+        Self::attach_with_idempotency_key(
+            auth,
+            payment_method_id,
+            customer_id,
+            &IdempotencyKey::generate(),
+        )
+    }
+
+    pub fn attach_with_idempotency_key(
+        auth: &Auth,
+        payment_method_id: &str,
+        customer_id: &str,
+        idempotency_key: &IdempotencyKey,
+    ) -> Result<Self> {
         let params = AttachPaymentMethodParams {
             customer: customer_id.to_string(),
         };
-        
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/payment_methods/{}/attach", payment_method_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .form(&params)
-            .send()?;
-        
-        let payment_method: PaymentMethod = response.json()?;
-        Ok(payment_method)
+        post_payment_method(
+            auth,
+            &format!(
+                "https://api.stripe.com/v1/payment_methods/{}/attach",
+                payment_method_id
+            ),
+            &params,
+            idempotency_key,
+        )
     }
 
     /// Attach a payment method to a customer (async)
-    pub async fn attach_async(auth: &Auth, payment_method_id: &str, customer_id: &str) -> Result<Self> {
-        let rate_limiter = get_rate_limiter();
-        let payment_method_id = payment_method_id.to_string();
-        let customer_id = customer_id.to_string();
-        
-        rate_limiter.execute_with_retry_async("stripe", move || {
-            let payment_method_id = payment_method_id.clone();
-            let customer_id = customer_id.clone();
-            async move {
-                let client = reqwest::Client::new();
-                let params = AttachPaymentMethodParams {
-                    customer: customer_id,
-                };
-                
-                let response = client
-                    .post(&format!("https://api.stripe.com/v1/payment_methods/{}/attach", payment_method_id))
-                    .header("Authorization", format!("Bearer {}", auth.secret))
-                    .form(&params)
-                    .send()
-                    .await?;
-                
-                let payment_method: PaymentMethod = response.json().await?;
-                Ok(payment_method)
-            }
-        }).await
+    pub async fn attach_async(
+        auth: &Auth,
+        payment_method_id: &str,
+        customer_id: &str,
+    ) -> Result<Self> {
+        Self::attach_async_with_idempotency_key(
+            auth,
+            payment_method_id,
+            customer_id,
+            IdempotencyKey::generate(),
+        )
+        .await
+    }
+
+    pub async fn attach_async_with_idempotency_key(
+        auth: &Auth,
+        payment_method_id: &str,
+        customer_id: &str,
+        idempotency_key: IdempotencyKey,
+    ) -> Result<Self> {
+        post_payment_method_async(
+            auth,
+            format!(
+                "https://api.stripe.com/v1/payment_methods/{}/attach",
+                payment_method_id
+            ),
+            AttachPaymentMethodParams {
+                customer: customer_id.to_string(),
+            },
+            idempotency_key,
+        )
+        .await
     }
 
     /// Detach a payment method from a customer
     pub fn detach(auth: &Auth, payment_method_id: &str) -> Result<Self> {
-        let client = reqwest::blocking::Client::new();
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/payment_methods/{}/detach", payment_method_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .send()?;
-        
-        let payment_method: PaymentMethod = response.json()?;
-        Ok(payment_method)
+        Self::detach_with_idempotency_key(
+            auth,
+            payment_method_id,
+            &IdempotencyKey::generate(),
+        )
+    }
+
+    pub fn detach_with_idempotency_key(
+        auth: &Auth,
+        payment_method_id: &str,
+        idempotency_key: &IdempotencyKey,
+    ) -> Result<Self> {
+        post_payment_method(
+            auth,
+            &format!(
+                "https://api.stripe.com/v1/payment_methods/{}/detach",
+                payment_method_id
+            ),
+            &[] as &[(String, String)],
+            idempotency_key,
+        )
     }
 
     /// Detach a payment method from a customer (async)
     pub async fn detach_async(auth: &Auth, payment_method_id: &str) -> Result<Self> {
-        let rate_limiter = get_rate_limiter();
-        let payment_method_id = payment_method_id.to_string();
-        
-        rate_limiter.execute_with_retry_async("stripe", move || {
-            let payment_method_id = payment_method_id.clone();
-            async move {
-                let client = reqwest::Client::new();
-                let response = client
-                    .post(&format!("https://api.stripe.com/v1/payment_methods/{}/detach", payment_method_id))
-                    .header("Authorization", format!("Bearer {}", auth.secret))
-                    .send()
-                    .await?;
-                
-                let payment_method: PaymentMethod = response.json().await?;
-                Ok(payment_method)
-            }
-        }).await
+        Self::detach_async_with_idempotency_key(
+            auth,
+            payment_method_id,
+            IdempotencyKey::generate(),
+        )
+        .await
+    }
+
+    pub async fn detach_async_with_idempotency_key(
+        auth: &Auth,
+        payment_method_id: &str,
+        idempotency_key: IdempotencyKey,
+    ) -> Result<Self> {
+        post_payment_method_async(
+            auth,
+            format!(
+                "https://api.stripe.com/v1/payment_methods/{}/detach",
+                payment_method_id
+            ),
+            Vec::<(String, String)>::new(),
+            idempotency_key,
+        )
+        .await
     }
 }

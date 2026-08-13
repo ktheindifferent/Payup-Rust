@@ -59,7 +59,7 @@ impl StripeWebhookHandler {
     pub fn with_tolerance(signing_secret: String, tolerance: i64) -> Self {
         Self {
             signing_secret,
-            tolerance,
+            tolerance: tolerance.max(0),
         }
     }
 
@@ -93,7 +93,7 @@ impl StripeWebhookHandler {
             .map_err(|e| PayupError::GenericError(format!("System time error: {}", e)))?
             .as_secs() as i64;
         
-        if (current_timestamp - header.timestamp).abs() > self.tolerance {
+        if current_timestamp.abs_diff(header.timestamp) > self.tolerance as u64 {
             return Err(PayupError::ValidationError(
                 "Webhook timestamp outside tolerance window".to_string()
             ));
@@ -122,18 +122,29 @@ impl StripeWebhookHandler {
         let mut timestamp = None;
         let mut signatures = Vec::new();
         
-        for element in header.split(' ') {
-            let parts: Vec<&str> = element.splitn(2, '=').collect();
-            if parts.len() != 2 {
+        for element in header.split(',') {
+            let Some((scheme, value)) = element.trim().split_once('=') else {
                 continue;
-            }
+            };
             
-            match parts[0] {
+            match scheme {
                 "t" => {
-                    timestamp = parts[1].parse::<i64>().ok();
+                    let parsed = value.parse::<i64>().map_err(|_| {
+                        PayupError::ValidationError(
+                            "Invalid signature header: invalid timestamp".to_string(),
+                        )
+                    })?;
+                    if timestamp.is_some_and(|existing| existing != parsed) {
+                        return Err(PayupError::ValidationError(
+                            "Invalid signature header: conflicting timestamps".to_string(),
+                        ));
+                    }
+                    timestamp = Some(parsed);
                 }
                 "v1" => {
-                    signatures.push(parts[1].to_string());
+                    if !value.is_empty() {
+                        signatures.push(value.to_string());
+                    }
                 }
                 _ => {} // Ignore other versions
             }
@@ -304,7 +315,7 @@ mod tests {
     #[test]
     fn test_signature_header_parsing() {
         let handler = StripeWebhookHandler::new("test_secret".to_string());
-        let header = "t=1614556800 v1=5257a869e7ecb3f2e3c5a6d5e3b5a6d5e3b5a6d5e3b5a6d5e3b5a6d5e3b5a6d5";
+        let header = "t=1614556800,v1=5257a869e7ecb3f2e3c5a6d5e3b5a6d5e3b5a6d5e3b5a6d5e3b5a6d5e3b5a6d5";
         
         let parsed = handler.parse_signature_header(header)
             .expect("Failed to parse valid signature header");

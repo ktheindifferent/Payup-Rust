@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+use crate::http_client::{get_shared_blocking_client, get_shared_client};
 use crate::stripe::auth::Auth;
-use crate::http_client::{get_shared_client, get_shared_blocking_client};
+use crate::stripe::request::{
+    idempotent_blocking_request, idempotent_request, parse_async_response, parse_blocking_response,
+    IdempotencyKey,
+};
 
 /// Shipping information for charges
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,7 +53,7 @@ impl Shipping {
     /// Convert to URL-encoded parameters for API requests
     pub fn to_params(&self) -> Vec<(String, String)> {
         let mut params = Vec::new();
-        
+
         if let Some(address) = &self.address {
             if let Some(city) = &address.city {
                 params.push(("shipping[address][city]".to_string(), city.clone()));
@@ -64,13 +68,16 @@ impl Shipping {
                 params.push(("shipping[address][line2]".to_string(), line2.clone()));
             }
             if let Some(postal_code) = &address.postal_code {
-                params.push(("shipping[address][postal_code]".to_string(), postal_code.clone()));
+                params.push((
+                    "shipping[address][postal_code]".to_string(),
+                    postal_code.clone(),
+                ));
             }
             if let Some(state) = &address.state {
                 params.push(("shipping[address][state]".to_string(), state.clone()));
             }
         }
-        
+
         if let Some(carrier) = &self.carrier {
             params.push(("shipping[carrier]".to_string(), carrier.clone()));
         }
@@ -81,9 +88,12 @@ impl Shipping {
             params.push(("shipping[phone]".to_string(), phone.clone()));
         }
         if let Some(tracking_number) = &self.tracking_number {
-            params.push(("shipping[tracking_number]".to_string(), tracking_number.clone()));
+            params.push((
+                "shipping[tracking_number]".to_string(),
+                tracking_number.clone(),
+            ));
         }
-        
+
         params
     }
 }
@@ -126,6 +136,8 @@ impl Card {
 pub struct Charge {
     pub id: Option<String>,
     pub object: Option<String>,
+    /// Legacy request field. Stripe responses populate `stripe_amount` instead.
+    #[serde(skip)]
     pub amount: Option<String>,
     #[serde(rename = "amount")]
     pub stripe_amount: Option<i64>,
@@ -271,18 +283,21 @@ impl Charge {
     pub async fn async_capture(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
         let url = format!(
             "https://api.stripe.com/v1/charges/{}/capture",
-            self.id.clone().ok_or_else(|| crate::error::PayupError::ValidationError("Charge ID is required for capture".to_string()))?
+            self.id
+                .clone()
+                .ok_or_else(|| crate::error::PayupError::ValidationError(
+                    "Charge ID is required for capture".to_string()
+                ))?
         );
 
         let request = get_shared_client()
             .post(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .form(&self.to_capture_params())
             .send()
             .await?;
-
-        let json = request.json::<Self>().await?;
-        Ok(json)
+        parse_async_response(response).await
     }
 
     /// Asynchronously retrieves the details of a charge that has previously been created.
@@ -301,15 +316,14 @@ impl Charge {
     /// // Fetch customer using id
     /// let charge = payup::stripe::Charge::async_get(auth, "ch_test123".to_string()).await?;
     /// ```ignore
-    pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
+    pub async fn async_get(creds: Auth, id: String) -> crate::error::Result<Self> {
         let url = format!("https://api.stripe.com/v1/charges/{}", id);
         let request = get_shared_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()
             .await?;
-        let json = request.json::<Self>().await?;
-        Ok(json)
+        parse_async_response(request).await
     }
 
     /// Asynchronously returns all stripe charges.
@@ -327,7 +341,7 @@ impl Charge {
     /// // Fetch all customers from stripe
     /// let charges = payup::stripe::Charge::async_list(auth).await?;
     /// ```ignore
-    pub async fn async_list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
+    pub async fn async_list(creds: Auth) -> crate::error::Result<Vec<Self>> {
         let mut objects = Vec::new();
         let mut has_more = true;
         let mut starting_after = None;
@@ -362,16 +376,16 @@ impl Charge {
     ///
     /// charge = charge.async_post(auth.clone()).await?;
     /// ```ignore
-    pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+    pub async fn async_post(&self, creds: Auth) -> crate::error::Result<Self> {
         let request = get_shared_client()
             .post("https://api.stripe.com/v1/charges")
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .form(&self.to_params())
             .send()
             .await?;
 
-        let json = request.json::<Self>().await?;
-        Ok(json)
+        parse_async_response(response).await
     }
 
     /// Asynchronously POSTs an update to an existing Charge
@@ -398,15 +412,18 @@ impl Charge {
         let request = get_shared_client()
             .post(format!(
                 "https://api.stripe.com/v1/charges/{}",
-                self.clone().id.ok_or_else(|| crate::error::PayupError::ValidationError("Charge ID is required for update".to_string()))?
+                self.clone()
+                    .id
+                    .ok_or_else(|| crate::error::PayupError::ValidationError(
+                        "Charge ID is required for update".to_string()
+                    ))?
             ))
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .form(&self.to_params())
             .send()
             .await?;
-
-        let json = request.json::<Self>().await?;
-        Ok(json)
+        parse_async_response(response).await
     }
 
     /// Capture the payment of an existing, uncaptured, charge.
@@ -438,17 +455,20 @@ impl Charge {
     pub fn capture(&self, creds: Auth) -> Result<Self, crate::error::PayupError> {
         let url = format!(
             "https://api.stripe.com/v1/charges/{}/capture",
-            self.id.clone().unwrap()
+            self.id
+                .clone()
+                .ok_or_else(|| crate::error::PayupError::ValidationError(
+                    "Charge ID is required for capture".to_string()
+                ))?
         );
 
         let request = get_shared_blocking_client()
             .post(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate())
             .form(&self.to_capture_params())
             .send()?;
-
-        let json = request.json::<Self>()?;
-        Ok(json)
+        parse_blocking_response(response)
     }
 
     /// Retrieves the details of a charge that has previously been created.
@@ -467,14 +487,13 @@ impl Charge {
     /// // Fetch customer using id
     /// let charge = payup::stripe::Charge::get(auth, "ch_test123".to_string());
     /// ```ignore
-    pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
+    pub fn get(creds: Auth, id: String) -> crate::error::Result<Self> {
         let url = format!("https://api.stripe.com/v1/charges/{}", id);
         let request = get_shared_blocking_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()?;
-        let json = request.json::<Self>()?;
-        Ok(json)
+        parse_blocking_response(request)
     }
 
     /// Returns all stripe charges.
@@ -492,7 +511,7 @@ impl Charge {
     /// // Fetch all customers from stripe
     /// let charges = payup::stripe::Charge::list(auth)?;
     /// ```ignore
-    pub fn list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
+    pub fn list(creds: Auth) -> crate::error::Result<Vec<Self>> {
         let mut objects = Vec::new();
         let mut has_more = true;
         let mut starting_after = None;
@@ -527,15 +546,15 @@ impl Charge {
     ///
     /// charge = charge.post(auth.clone())?;
     /// ```ignore
-    pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+    pub fn post(&self, creds: Auth) -> crate::error::Result<Self> {
         let request = get_shared_blocking_client()
             .post("https://api.stripe.com/v1/charges")
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate())
             .form(&self.to_params())
             .send()?;
 
-        let json = request.json::<Self>()?;
-        Ok(json)
+        parse_blocking_response(response)
     }
 
     /// POSTs an update to an existing Charge
@@ -562,17 +581,23 @@ impl Charge {
         let request = get_shared_blocking_client()
             .post(format!(
                 "https://api.stripe.com/v1/charges/{}",
-                self.clone().id.ok_or_else(|| crate::error::PayupError::ValidationError("Charge ID is required for update".to_string()))?
+                self.clone()
+                    .id
+                    .ok_or_else(|| crate::error::PayupError::ValidationError(
+                        "Charge ID is required for update".to_string()
+                    ))?
             ))
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate())
             .form(&self.to_params())
             .send()?;
-
-        let json = request.json::<Self>()?;
-        Ok(json)
+        parse_blocking_response(response)
     }
 
-    fn list_chunk(creds: Auth, starting_after: Option<String>) -> Result<Charges, reqwest::Error> {
+    fn list_chunk(
+        creds: Auth,
+        starting_after: Option<String>,
+    ) -> crate::error::Result<Charges> {
         let mut url = "https://api.stripe.com/v1/charges".to_string();
 
         if starting_after.is_some() {
@@ -584,17 +609,16 @@ impl Charge {
 
         let request = get_shared_blocking_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()?;
 
-        let json = request.json::<Charges>()?;
-        Ok(json)
+        parse_blocking_response(request)
     }
 
     async fn list_chunk_async(
         creds: Auth,
         starting_after: Option<String>,
-    ) -> Result<Charges, reqwest::Error> {
+    ) -> crate::error::Result<Charges> {
         let mut url = "https://api.stripe.com/v1/charges".to_string();
 
         if starting_after.is_some() {
@@ -606,12 +630,11 @@ impl Charge {
 
         let request = get_shared_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()
             .await?;
 
-        let json = request.json::<Charges>().await?;
-        Ok(json)
+        parse_async_response(request).await
     }
 
     fn to_capture_params(&self) -> Vec<(&str, &str)> {
@@ -667,10 +690,16 @@ impl Charge {
             params.push(("source".to_string(), source.clone()));
         }
         if let Some(statement_descriptor) = &self.statement_descriptor {
-            params.push(("statement_descriptor".to_string(), statement_descriptor.clone()));
+            params.push((
+                "statement_descriptor".to_string(),
+                statement_descriptor.clone(),
+            ));
         }
         if let Some(statement_descriptor_suffix) = &self.statement_descriptor_suffix {
-            params.push(("statement_descriptor_suffix".to_string(), statement_descriptor_suffix.clone()));
+            params.push((
+                "statement_descriptor_suffix".to_string(),
+                statement_descriptor_suffix.clone(),
+            ));
         }
         params
     }
@@ -687,6 +716,18 @@ pub struct Charges {
     #[serde(rename = "has_more")]
     pub has_more: bool,
     pub data: Vec<Charge>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Charge;
+
+    #[test]
+    fn deserializes_numeric_stripe_amount() {
+        let charge: Charge = serde_json::from_str(r#"{"amount":1234}"#).expect("charge response");
+        assert_eq!(charge.stripe_amount, Some(1234));
+        assert_eq!(charge.amount, None);
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

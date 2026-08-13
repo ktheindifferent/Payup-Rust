@@ -5,7 +5,7 @@ use std::env;
 fn get_test_auth() -> Auth {
     let api_key = env::var("STRIPE_TEST_API_KEY")
         .unwrap_or_else(|_| "sk_test_placeholder".to_string());
-    Auth::new(api_key)
+    Auth::new(api_key.clone(), api_key)
 }
 
 fn get_test_provider() -> StripeProvider {

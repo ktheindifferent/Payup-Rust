@@ -46,6 +46,18 @@ pub enum PayupError {
         message: String,
         param: Option<String>,
     },
+
+    /// A structured error returned by the Stripe HTTP API.
+    StripeApiError {
+        status: u16,
+        error_type: String,
+        code: Option<String>,
+        decline_code: Option<String>,
+        message: String,
+        param: Option<String>,
+        request_id: Option<String>,
+        retry_after: Option<u64>,
+    },
     
     PayPalError {
         name: String,
@@ -121,6 +133,36 @@ impl fmt::Display for PayupError {
             
             PayupError::StripeError { error_type, code, message, param } => 
                 self.format_stripe_error(f, error_type, code.as_deref(), message, param.as_deref()),
+
+            PayupError::StripeApiError {
+                status,
+                error_type,
+                code,
+                decline_code,
+                message,
+                param,
+                request_id,
+                retry_after,
+            } => {
+                write!(f, "Stripe API error HTTP {} {}", status, error_type)?;
+                if let Some(code) = code {
+                    write!(f, " ({})", code)?;
+                }
+                if let Some(decline_code) = decline_code {
+                    write!(f, " [decline_code={}]", decline_code)?;
+                }
+                write!(f, ": {}", message)?;
+                if let Some(param) = param {
+                    write!(f, " [param={}]", param)?;
+                }
+                if let Some(request_id) = request_id {
+                    write!(f, " [request_id={}]", request_id)?;
+                }
+                if let Some(retry_after) = retry_after {
+                    write!(f, " [retry_after={}s]", retry_after)?;
+                }
+                Ok(())
+            }
             
             PayupError::PayPalError { name, message, debug_id, .. } => 
                 self.format_paypal_error(f, name, message, debug_id.as_deref()),

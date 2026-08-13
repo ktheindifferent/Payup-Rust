@@ -115,7 +115,7 @@ pub struct Subscription {
     pub cancel_at_period_end: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SubscriptionStatus {
     Active,
     PastDue,

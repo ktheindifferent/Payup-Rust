@@ -22,7 +22,7 @@ fn test_webhook_signature_verification_success() {
     let payload = r#"{"id":"evt_test","type":"payment_intent.succeeded"}"#;
     let timestamp = chrono::Utc::now().timestamp();
     let signature = generate_test_signature(secret, timestamp, payload);
-    let header = format!("t={} v1={}", timestamp, signature);
+    let header = format!("t={},v1={}", timestamp, signature);
     
     // Should succeed with valid signature
     assert!(handler.verify_signature(payload, &header).is_ok());
@@ -34,7 +34,7 @@ fn test_webhook_signature_verification_invalid_signature() {
     
     let payload = r#"{"id":"evt_test","type":"payment_intent.succeeded"}"#;
     let timestamp = chrono::Utc::now().timestamp();
-    let header = format!("t={} v1=invalid_signature", timestamp);
+    let header = format!("t={},v1=invalid_signature", timestamp);
     
     // Should fail with invalid signature
     assert!(handler.verify_signature(payload, &header).is_err());
@@ -48,7 +48,7 @@ fn test_webhook_signature_verification_expired_timestamp() {
     let payload = r#"{"id":"evt_test","type":"payment_intent.succeeded"}"#;
     let old_timestamp = chrono::Utc::now().timestamp() - 400; // 400 seconds ago (outside 5 min window)
     let signature = generate_test_signature(secret, old_timestamp, payload);
-    let header = format!("t={} v1={}", old_timestamp, signature);
+    let header = format!("t={},v1={}", old_timestamp, signature);
     
     // Should fail with expired timestamp
     let result = handler.verify_signature(payload, &header);
@@ -81,7 +81,7 @@ fn test_webhook_event_parsing() {
     
     let timestamp = chrono::Utc::now().timestamp();
     let signature = generate_test_signature(secret, timestamp, payload);
-    let header = format!("t={} v1={}", timestamp, signature);
+    let header = format!("t={},v1={}", timestamp, signature);
     
     let event = handler.construct_event(payload, &header).unwrap();
     
@@ -125,7 +125,7 @@ fn test_webhook_with_custom_tolerance() {
     let payload = r#"{"id":"evt_test","type":"payment_intent.succeeded"}"#;
     let timestamp = chrono::Utc::now().timestamp() - 30; // 30 seconds ago
     let signature = generate_test_signature(secret, timestamp, payload);
-    let header = format!("t={} v1={}", timestamp, signature);
+    let header = format!("t={},v1={}", timestamp, signature);
     
     // Should succeed within 1 minute tolerance
     assert!(handler.verify_signature(payload, &header).is_ok());
@@ -133,7 +133,7 @@ fn test_webhook_with_custom_tolerance() {
     // Test with timestamp outside tolerance
     let old_timestamp = chrono::Utc::now().timestamp() - 120; // 2 minutes ago
     let old_signature = generate_test_signature(secret, old_timestamp, payload);
-    let old_header = format!("t={} v1={}", old_timestamp, old_signature);
+    let old_header = format!("t={},v1={}", old_timestamp, old_signature);
     
     // Should fail outside 1 minute tolerance
     assert!(handler.verify_signature(payload, &old_header).is_err());
@@ -149,10 +149,32 @@ fn test_webhook_multiple_signatures() {
     let valid_signature = generate_test_signature(secret, timestamp, payload);
     
     // Header with multiple signatures (one valid, one invalid)
-    let header = format!("t={} v1=invalid_sig v1={}", timestamp, valid_signature);
+    let header = format!("t={},v1=invalid_sig,v1={}", timestamp, valid_signature);
     
     // Should succeed if at least one signature is valid
     assert!(handler.verify_signature(payload, &header).is_ok());
+}
+
+#[test]
+fn test_webhook_comma_delimited_header_with_spaces() {
+    let secret = "whsec_test_secret";
+    let handler = StripeWebhookHandler::new(secret.to_string());
+    let payload = r#"{"id":"evt_test","type":"payment_intent.succeeded"}"#;
+    let timestamp = chrono::Utc::now().timestamp();
+    let signature = generate_test_signature(secret, timestamp, payload);
+    let header = format!("t={}, v1={}", timestamp, signature);
+
+    assert!(handler.verify_signature(payload, &header).is_ok());
+}
+
+#[test]
+fn test_webhook_rejects_conflicting_timestamps() {
+    let handler = StripeWebhookHandler::new("whsec_test_secret".to_string());
+    let payload = r#"{"id":"evt_test","type":"payment_intent.succeeded"}"#;
+    let timestamp = chrono::Utc::now().timestamp();
+    let header = format!("t={},t={},v1=unused", timestamp, timestamp + 1);
+
+    assert!(handler.verify_signature(payload, &header).is_err());
 }
 
 #[test]

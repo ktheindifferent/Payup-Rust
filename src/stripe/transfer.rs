@@ -1,8 +1,12 @@
-use serde::{Deserialize, Serialize};
-use crate::error::Result;
-use crate::rate_limiter::get_rate_limiter;
-use crate::http_client::{get_shared_client, get_shared_blocking_client};
 use super::Auth;
+use crate::error::Result;
+use crate::http_client::{get_shared_blocking_client, get_shared_client};
+use crate::rate_limiter::get_rate_limiter;
+use crate::stripe::request::{
+    idempotent_blocking_request, idempotent_request, parse_async_response, parse_blocking_response,
+    IdempotencyKey,
+};
+use serde::{Deserialize, Serialize};
 
 /// Represents a Stripe Transfer object for moving funds between Stripe accounts
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,11 +94,11 @@ pub struct CreateReversalParams {
 
 impl Transfer {
     /// Create a new transfer
-    /// 
+    ///
     /// # Example
     /// ```ignore
     /// use payup::stripe::{Auth, Transfer, CreateTransferParams};
-    /// 
+    ///
     /// let auth = Auth::new("test_key".to_string(), "test_secret".to_string());
     /// let params = CreateTransferParams {
     ///     amount: 1000,
@@ -109,101 +113,124 @@ impl Transfer {
     /// ```
     pub fn create(auth: &Auth, params: CreateTransferParams) -> Result<Self> {
         let client = get_shared_blocking_client();
-        let response = client
+        let request = client
             .post("https://api.stripe.com/v1/transfers")
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate())
             .form(&params)
             .send()?;
-        
-        let transfer: Transfer = response.json()?;
-        Ok(transfer)
+        parse_blocking_response(response)
     }
 
     /// Create a new transfer (async)
     pub async fn create_async(auth: &Auth, params: CreateTransferParams) -> Result<Self> {
         let rate_limiter = get_rate_limiter();
-        
-        rate_limiter.execute_with_retry_async("stripe", || async {
-            let client = get_shared_client();
-            let response = client
-                .post("https://api.stripe.com/v1/transfers")
-                .header("Authorization", format!("Bearer {}", auth.secret))
-                .form(&params)
-                .send()
-                .await?;
-            
-            let transfer: Transfer = response.json().await?;
-            Ok(transfer)
-        }).await
+        let idempotency_key = IdempotencyKey::generate();
+
+        rate_limiter
+            .execute_with_retry_async("stripe", move || {
+                let idempotency_key = idempotency_key.clone();
+                let params = params.clone();
+                async move {
+                    let client = get_shared_client();
+                    let request = client
+                        .post("https://api.stripe.com/v1/transfers")
+                        .header("Authorization", format!("Bearer {}", auth.api_key()));
+                    let response = idempotent_request(request, &idempotency_key)
+                        .form(&params)
+                        .send()
+                        .await?;
+                    parse_async_response(response).await
+                }
+            })
+            .await
     }
 
     /// Retrieve a transfer by ID
     pub fn retrieve(auth: &Auth, transfer_id: &str) -> Result<Self> {
         let client = get_shared_blocking_client();
         let response = client
-            .get(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .get(&format!(
+                "https://api.stripe.com/v1/transfers/{}",
+                transfer_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()?;
-        
-        let transfer: Transfer = response.json()?;
-        Ok(transfer)
+
+        parse_blocking_response(response)
     }
 
     /// Retrieve a transfer by ID (async)
     pub async fn retrieve_async(auth: &Auth, transfer_id: &str) -> Result<Self> {
         let rate_limiter = get_rate_limiter();
         let transfer_id = transfer_id.to_string();
-        
-        rate_limiter.execute_with_retry_async("stripe", move || {
-            let transfer_id = transfer_id.clone();
-            async move {
-                let client = get_shared_client();
-                let response = client
-                    .get(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
-                    .header("Authorization", format!("Bearer {}", auth.secret))
-                    .send()
-                    .await?;
-                
-                let transfer: Transfer = response.json().await?;
-                Ok(transfer)
-            }
-        }).await
+
+        rate_limiter
+            .execute_with_retry_async("stripe", move || {
+                let transfer_id = transfer_id.clone();
+                async move {
+                    let client = get_shared_client();
+                    let response = client
+                        .get(&format!(
+                            "https://api.stripe.com/v1/transfers/{}",
+                            transfer_id
+                        ))
+                        .header("Authorization", format!("Bearer {}", auth.api_key()))
+                        .send()
+                        .await?;
+
+                    parse_async_response(response).await
+                }
+            })
+            .await
     }
 
     /// Update a transfer
     pub fn update(auth: &Auth, transfer_id: &str, params: UpdateTransferParams) -> Result<Self> {
         let client = get_shared_blocking_client();
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+        let request = client
+            .post(&format!(
+                "https://api.stripe.com/v1/transfers/{}",
+                transfer_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate())
             .form(&params)
             .send()?;
-        
-        let transfer: Transfer = response.json()?;
-        Ok(transfer)
+        parse_blocking_response(response)
     }
 
     /// Update a transfer (async)
-    pub async fn update_async(auth: &Auth, transfer_id: &str, params: UpdateTransferParams) -> Result<Self> {
+    pub async fn update_async(
+        auth: &Auth,
+        transfer_id: &str,
+        params: UpdateTransferParams,
+    ) -> Result<Self> {
         let rate_limiter = get_rate_limiter();
         let transfer_id = transfer_id.to_string();
-        
-        rate_limiter.execute_with_retry_async("stripe", move || {
-            let transfer_id = transfer_id.clone();
-            let params = params.clone();
-            async move {
-                let client = get_shared_client();
-                let response = client
-                    .post(&format!("https://api.stripe.com/v1/transfers/{}", transfer_id))
-                    .header("Authorization", format!("Bearer {}", auth.secret))
-                    .form(&params)
-                    .send()
-                    .await?;
-                
-                let transfer: Transfer = response.json().await?;
-                Ok(transfer)
-            }
-        }).await
+        let idempotency_key = IdempotencyKey::generate();
+
+        rate_limiter
+            .execute_with_retry_async("stripe", move || {
+                let transfer_id = transfer_id.clone();
+                let params = params.clone();
+                let idempotency_key = idempotency_key.clone();
+                async move {
+                    let client = get_shared_client();
+                    let request = client
+                        .post(&format!(
+                            "https://api.stripe.com/v1/transfers/{}",
+                            transfer_id
+                        ))
+                        .header("Authorization", format!("Bearer {}", auth.api_key()));
+                    let response = idempotent_request(request, &idempotency_key)
+                        .form(&params)
+                        .send()
+                        .await?;
+                    parse_async_response(response).await
+                }
+            })
+            .await
     }
 
     /// List all transfers
@@ -213,169 +240,217 @@ impl Transfer {
         if let Some(limit) = limit {
             url = format!("{}?limit={}", url, limit);
         }
-        
+
         let response = client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()?;
-        
+
         #[derive(Deserialize)]
         struct TransferList {
             data: Vec<Transfer>,
         }
-        
-        let list: TransferList = response.json()?;
+
+        let list: TransferList = parse_blocking_response(response)?;
         Ok(list.data)
     }
 
     /// List all transfers (async)
     pub async fn list_async(auth: &Auth, limit: Option<u32>) -> Result<Vec<Self>> {
         let rate_limiter = get_rate_limiter();
-        
-        rate_limiter.execute_with_retry_async("stripe", move || async move {
-            let client = get_shared_client();
-            let mut url = "https://api.stripe.com/v1/transfers".to_string();
-            if let Some(limit) = limit {
-                url = format!("{}?limit={}", url, limit);
-            }
-            
-            let response = client
-                .get(&url)
-                .header("Authorization", format!("Bearer {}", auth.secret))
-                .send()
-                .await?;
-            
-            #[derive(Deserialize)]
-            struct TransferList {
-                data: Vec<Transfer>,
-            }
-            
-            let list: TransferList = response.json().await?;
-            Ok(list.data)
-        }).await
+
+        rate_limiter
+            .execute_with_retry_async("stripe", move || async move {
+                let client = get_shared_client();
+                let mut url = "https://api.stripe.com/v1/transfers".to_string();
+                if let Some(limit) = limit {
+                    url = format!("{}?limit={}", url, limit);
+                }
+
+                let response = client
+                    .get(&url)
+                    .header("Authorization", format!("Bearer {}", auth.api_key()))
+                    .send()
+                    .await?;
+
+                #[derive(Deserialize)]
+                struct TransferList {
+                    data: Vec<Transfer>,
+                }
+
+                let list: TransferList = parse_async_response(response).await?;
+                Ok(list.data)
+            })
+            .await
     }
 
     /// Create a transfer reversal
-    pub fn create_reversal(auth: &Auth, transfer_id: &str, params: CreateReversalParams) -> Result<TransferReversal> {
+    pub fn create_reversal(
+        auth: &Auth,
+        transfer_id: &str,
+        params: CreateReversalParams,
+    ) -> Result<TransferReversal> {
         let client = get_shared_blocking_client();
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+        let request = client
+            .post(&format!(
+                "https://api.stripe.com/v1/transfers/{}/reversals",
+                transfer_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate())
             .form(&params)
             .send()?;
-        
-        let reversal: TransferReversal = response.json()?;
-        Ok(reversal)
+        parse_blocking_response(response)
     }
 
     /// Create a transfer reversal (async)
-    pub async fn create_reversal_async(auth: &Auth, transfer_id: &str, params: CreateReversalParams) -> Result<TransferReversal> {
+    pub async fn create_reversal_async(
+        auth: &Auth,
+        transfer_id: &str,
+        params: CreateReversalParams,
+    ) -> Result<TransferReversal> {
         let rate_limiter = get_rate_limiter();
         let transfer_id = transfer_id.to_string();
-        
-        rate_limiter.execute_with_retry_async("stripe", move || {
-            let transfer_id = transfer_id.clone();
-            let params = params.clone();
-            async move {
-                let client = get_shared_client();
-                let response = client
-                    .post(&format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id))
-                    .header("Authorization", format!("Bearer {}", auth.secret))
-                    .form(&params)
-                    .send()
-                    .await?;
-                
-                let reversal: TransferReversal = response.json().await?;
-                Ok(reversal)
-            }
-        }).await
+        let idempotency_key = IdempotencyKey::generate();
+
+        rate_limiter
+            .execute_with_retry_async("stripe", move || {
+                let transfer_id = transfer_id.clone();
+                let params = params.clone();
+                let idempotency_key = idempotency_key.clone();
+                async move {
+                    let client = get_shared_client();
+                    let request = client
+                        .post(&format!(
+                            "https://api.stripe.com/v1/transfers/{}/reversals",
+                            transfer_id
+                        ))
+                        .header("Authorization", format!("Bearer {}", auth.api_key()));
+                    let response = idempotent_request(request, &idempotency_key)
+                        .form(&params)
+                        .send()
+                        .await?;
+                    parse_async_response(response).await
+                }
+            })
+            .await
     }
 
     /// Retrieve a transfer reversal
-    pub fn retrieve_reversal(auth: &Auth, transfer_id: &str, reversal_id: &str) -> Result<TransferReversal> {
+    pub fn retrieve_reversal(
+        auth: &Auth,
+        transfer_id: &str,
+        reversal_id: &str,
+    ) -> Result<TransferReversal> {
         let client = get_shared_blocking_client();
         let response = client
-            .get(&format!("https://api.stripe.com/v1/transfers/{}/reversals/{}", transfer_id, reversal_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .get(&format!(
+                "https://api.stripe.com/v1/transfers/{}/reversals/{}",
+                transfer_id, reversal_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()?;
-        
-        let reversal: TransferReversal = response.json()?;
-        Ok(reversal)
+
+        parse_blocking_response(response)
     }
 
     /// Retrieve a transfer reversal (async)
-    pub async fn retrieve_reversal_async(auth: &Auth, transfer_id: &str, reversal_id: &str) -> Result<TransferReversal> {
+    pub async fn retrieve_reversal_async(
+        auth: &Auth,
+        transfer_id: &str,
+        reversal_id: &str,
+    ) -> Result<TransferReversal> {
         let rate_limiter = get_rate_limiter();
         let transfer_id = transfer_id.to_string();
         let reversal_id = reversal_id.to_string();
-        
-        rate_limiter.execute_with_retry_async("stripe", move || {
-            let transfer_id = transfer_id.clone();
-            let reversal_id = reversal_id.clone();
-            async move {
-                let client = get_shared_client();
-                let response = client
-                    .get(&format!("https://api.stripe.com/v1/transfers/{}/reversals/{}", transfer_id, reversal_id))
-                    .header("Authorization", format!("Bearer {}", auth.secret))
-                    .send()
-                    .await?;
-                
-                let reversal: TransferReversal = response.json().await?;
-                Ok(reversal)
-            }
-        }).await
+
+        rate_limiter
+            .execute_with_retry_async("stripe", move || {
+                let transfer_id = transfer_id.clone();
+                let reversal_id = reversal_id.clone();
+                async move {
+                    let client = get_shared_client();
+                    let response = client
+                        .get(&format!(
+                            "https://api.stripe.com/v1/transfers/{}/reversals/{}",
+                            transfer_id, reversal_id
+                        ))
+                        .header("Authorization", format!("Bearer {}", auth.api_key()))
+                        .send()
+                        .await?;
+
+                    parse_async_response(response).await
+                }
+            })
+            .await
     }
 
     /// List all reversals for a transfer
-    pub fn list_reversals(auth: &Auth, transfer_id: &str, limit: Option<u32>) -> Result<Vec<TransferReversal>> {
+    pub fn list_reversals(
+        auth: &Auth,
+        transfer_id: &str,
+        limit: Option<u32>,
+    ) -> Result<Vec<TransferReversal>> {
         let client = get_shared_blocking_client();
-        let mut url = format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id);
+        let mut url = format!(
+            "https://api.stripe.com/v1/transfers/{}/reversals",
+            transfer_id
+        );
         if let Some(limit) = limit {
             url = format!("{}?limit={}", url, limit);
         }
-        
+
         let response = client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()?;
-        
+
         #[derive(Deserialize)]
         struct ReversalList {
             data: Vec<TransferReversal>,
         }
-        
-        let list: ReversalList = response.json()?;
+
+        let list: ReversalList = parse_blocking_response(response)?;
         Ok(list.data)
     }
 
     /// List all reversals for a transfer (async)
-    pub async fn list_reversals_async(auth: &Auth, transfer_id: &str, limit: Option<u32>) -> Result<Vec<TransferReversal>> {
+    pub async fn list_reversals_async(
+        auth: &Auth,
+        transfer_id: &str,
+        limit: Option<u32>,
+    ) -> Result<Vec<TransferReversal>> {
         let rate_limiter = get_rate_limiter();
         let transfer_id = transfer_id.to_string();
-        
-        rate_limiter.execute_with_retry_async("stripe", move || {
-            let transfer_id = transfer_id.clone();
-            async move {
-                let client = get_shared_client();
-                let mut url = format!("https://api.stripe.com/v1/transfers/{}/reversals", transfer_id);
-                if let Some(limit) = limit {
-                    url = format!("{}?limit={}", url, limit);
+
+        rate_limiter
+            .execute_with_retry_async("stripe", move || {
+                let transfer_id = transfer_id.clone();
+                async move {
+                    let client = get_shared_client();
+                    let mut url = format!(
+                        "https://api.stripe.com/v1/transfers/{}/reversals",
+                        transfer_id
+                    );
+                    if let Some(limit) = limit {
+                        url = format!("{}?limit={}", url, limit);
+                    }
+
+                    let response = client
+                        .get(&url)
+                        .header("Authorization", format!("Bearer {}", auth.api_key()))
+                        .send()
+                        .await?;
+
+                    #[derive(Deserialize)]
+                    struct ReversalList {
+                        data: Vec<TransferReversal>,
+                    }
+
+                    let list: ReversalList = parse_async_response(response).await?;
+                    Ok(list.data)
                 }
-                
-                let response = client
-                    .get(&url)
-                    .header("Authorization", format!("Bearer {}", auth.secret))
-                    .send()
-                    .await?;
-                
-                #[derive(Deserialize)]
-                struct ReversalList {
-                    data: Vec<TransferReversal>,
-                }
-                
-                let list: ReversalList = response.json().await?;
-                Ok(list.data)
-            }
-        }).await
+            })
+            .await
     }
 }

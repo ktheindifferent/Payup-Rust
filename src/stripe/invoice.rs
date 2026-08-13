@@ -1,7 +1,28 @@
+use crate::http_client::get_shared_client;
+use crate::stripe::auth::Auth;
+use crate::stripe::request::{idempotent_request, parse_async_response, IdempotencyKey};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::stripe::auth::Auth;
-use crate::http_client::{get_shared_client, get_shared_blocking_client};
+
+async fn post_stripe<T, P>(
+    auth: &Auth,
+    url: &str,
+    params: &P,
+    idempotency_key: &IdempotencyKey,
+) -> crate::error::Result<T>
+where
+    T: serde::de::DeserializeOwned,
+    P: Serialize + ?Sized,
+{
+    let request = get_shared_client()
+        .post(url)
+        .header("Authorization", format!("Bearer {}", auth.api_key()));
+    let response = idempotent_request(request, idempotency_key)
+        .form(params)
+        .send()
+        .await?;
+    parse_async_response(response).await
+}
 
 /// Represents an invoice issued to a customer
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,7 +228,7 @@ pub enum BillingReason {
 }
 
 /// Collection method for the invoice
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CollectionMethod {
     ChargeAutomatically,
@@ -453,12 +474,10 @@ impl Invoice {
         let url = format!("https://api.stripe.com/v1/invoices/{}", id);
         let response = get_shared_client()
             .get(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()
             .await?;
-        
-        let invoice = response.json::<Self>().await?;
-        Ok(invoice)
+        parse_async_response(response).await
     }
 
     /// Lists all invoices
@@ -466,118 +485,85 @@ impl Invoice {
         let url = "https://api.stripe.com/v1/invoices";
         let response = get_shared_client()
             .get(url)
-            .basic_auth(&auth.client, Some(&auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()
             .await?;
-        
-        let invoices = response.json::<InvoiceList>().await?;
-        Ok(invoices)
+        parse_async_response(response).await
     }
 
     /// Creates a new invoice
-    pub async fn create(auth: &Auth, params: CreateInvoiceParams) -> Result<Self, crate::error::PayupError> {
+    pub async fn create(
+        auth: &Auth,
+        params: CreateInvoiceParams,
+    ) -> Result<Self, crate::error::PayupError> {
+        Self::create_with_idempotency_key(auth, params, IdempotencyKey::generate()).await
+    }
+
+    pub async fn create_with_idempotency_key(
+        auth: &Auth,
+        params: CreateInvoiceParams,
+        idempotency_key: IdempotencyKey,
+    ) -> Result<Self, crate::error::PayupError> {
         let url = "https://api.stripe.com/v1/invoices";
-        let response = get_shared_client()
-            .post(url)
-            .basic_auth(&auth.client, Some(&auth.secret))
-            .form(&params)
-            .send()
-            .await?;
-        
-        let invoice = response.json::<Self>().await?;
-        Ok(invoice)
+        post_stripe(auth, url, &params, &idempotency_key).await
     }
 
     /// Updates an invoice
-    pub async fn update(auth: &Auth, id: &str, params: UpdateInvoiceParams) -> Result<Self, crate::error::PayupError> {
+    pub async fn update(
+        auth: &Auth,
+        id: &str,
+        params: UpdateInvoiceParams,
+    ) -> Result<Self, crate::error::PayupError> {
         let url = format!("https://api.stripe.com/v1/invoices/{}", id);
-        let response = get_shared_client()
-            .post(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
-            .form(&params)
-            .send()
-            .await?;
-        
-        let invoice = response.json::<Self>().await?;
-        Ok(invoice)
+        post_stripe(auth, &url, &params, &IdempotencyKey::generate()).await
     }
 
     /// Finalizes an invoice
     pub async fn finalize(auth: &Auth, id: &str) -> Result<Self, crate::error::PayupError> {
         let url = format!("https://api.stripe.com/v1/invoices/{}/finalize", id);
-        let response = get_shared_client()
-            .post(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
-            .send()
-            .await?;
-        
-        let invoice = response.json::<Self>().await?;
-        Ok(invoice)
+        post_stripe(auth, &url, &[] as &[(String, String)], &IdempotencyKey::generate()).await
     }
 
     /// Pays an invoice
     pub async fn pay(auth: &Auth, id: &str) -> Result<Self, crate::error::PayupError> {
         let url = format!("https://api.stripe.com/v1/invoices/{}/pay", id);
-        let response = get_shared_client()
-            .post(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
-            .send()
-            .await?;
-        
-        let invoice = response.json::<Self>().await?;
-        Ok(invoice)
+        post_stripe(auth, &url, &[] as &[(String, String)], &IdempotencyKey::generate()).await
     }
 
     /// Sends an invoice for manual payment
     pub async fn send(auth: &Auth, id: &str) -> Result<Self, crate::error::PayupError> {
         let url = format!("https://api.stripe.com/v1/invoices/{}/send", id);
-        let response = get_shared_client()
-            .post(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
-            .send()
-            .await?;
-        
-        let invoice = response.json::<Self>().await?;
-        Ok(invoice)
+        post_stripe(auth, &url, &[] as &[(String, String)], &IdempotencyKey::generate()).await
     }
 
     /// Voids an invoice
     pub async fn void(auth: &Auth, id: &str) -> Result<Self, crate::error::PayupError> {
         let url = format!("https://api.stripe.com/v1/invoices/{}/void", id);
-        let response = get_shared_client()
-            .post(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
-            .send()
-            .await?;
-        
-        let invoice = response.json::<Self>().await?;
-        Ok(invoice)
+        post_stripe(auth, &url, &[] as &[(String, String)], &IdempotencyKey::generate()).await
     }
 
     /// Marks an invoice as uncollectible
-    pub async fn mark_uncollectible(auth: &Auth, id: &str) -> Result<Self, crate::error::PayupError> {
-        let url = format!("https://api.stripe.com/v1/invoices/{}/mark_uncollectible", id);
-        let response = get_shared_client()
-            .post(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
-            .send()
-            .await?;
-        
-        let invoice = response.json::<Self>().await?;
-        Ok(invoice)
+    pub async fn mark_uncollectible(
+        auth: &Auth,
+        id: &str,
+    ) -> Result<Self, crate::error::PayupError> {
+        let url = format!(
+            "https://api.stripe.com/v1/invoices/{}/mark_uncollectible",
+            id
+        );
+        post_stripe(auth, &url, &[] as &[(String, String)], &IdempotencyKey::generate()).await
     }
 
     /// Deletes a draft invoice
     pub async fn delete(auth: &Auth, id: &str) -> Result<DeletedInvoice, crate::error::PayupError> {
         let url = format!("https://api.stripe.com/v1/invoices/{}", id);
-        let response = get_shared_client()
+        let request = get_shared_client()
             .delete(&url)
-            .basic_auth(&auth.client, Some(&auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .send()
             .await?;
-        
-        let result = response.json::<DeletedInvoice>().await?;
-        Ok(result)
+        parse_async_response(response).await
     }
 }
 

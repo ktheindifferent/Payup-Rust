@@ -1,40 +1,36 @@
-use async_trait::async_trait;
-use std::collections::HashMap;
+use super::{
+    Auth, CapturePaymentIntentParams, Charge, CreateCardParams, CreatePaymentIntentParams,
+    CreatePaymentMethodParams, Customer, PaymentIntent, PaymentIntentStatus, PaymentMethod,
+    StripePaymentMethodType, Subscription,
+};
 use crate::error::{PayupError, Result};
 use crate::payment_provider::{
-    PaymentProvider, PaymentFeature, Customer as UnifiedCustomer, PaymentMethod as UnifiedPaymentMethod,
-    PaymentMethodType, CardDetails, BankAccountDetails, Charge as UnifiedCharge, ChargeStatus,
-    Refund as UnifiedRefund, RefundStatus, RefundReason, Subscription as UnifiedSubscription,
-    SubscriptionStatus, Money
-};
-use super::{
-    Auth, Customer, Customers, Charge, PaymentIntent, PaymentIntentStatus,
-    PaymentMethod, StripePaymentMethodType, CreatePaymentMethodParams, CreateCardParams,
-    PaymentMethodBillingDetails, StripeCardDetails, PaymentMethodAddress,
-    Subscription, CreatePaymentIntentParams, UpdatePaymentIntentParams,
-    ConfirmPaymentIntentParams, CapturePaymentIntentParams
+    CardDetails, Charge as UnifiedCharge, ChargeStatus, Customer as UnifiedCustomer, Money,
+    PaymentFeature, PaymentMethod as UnifiedPaymentMethod, PaymentMethodType, PaymentProvider,
+    Refund as UnifiedRefund, RefundReason, RefundStatus, Subscription as UnifiedSubscription,
+    SubscriptionStatus,
 };
 use crate::stripe_ext::refund::Refund as StripeRefund;
+use async_trait::async_trait;
 use reqwest::Client;
-use serde_json::json;
 
 pub struct StripeProvider {
     auth: Auth,
-    client: Client,
+    _client: Client,
 }
 
 impl StripeProvider {
     pub fn new(api_key: String) -> Self {
         Self {
             auth: Auth::new(api_key.clone(), api_key),
-            client: Client::new(),
+            _client: Client::new(),
         }
     }
 
     pub fn with_client(api_key: String, client: Client) -> Self {
         Self {
             auth: Auth::new(api_key.clone(), api_key),
-            client,
+            _client: client,
         }
     }
 
@@ -134,22 +130,29 @@ impl StripeProvider {
     }
 
     fn map_charge_to_unified(&self, charge: &Charge) -> UnifiedCharge {
-        let status = if charge.paid.unwrap_or(false) {
-            if charge.captured.unwrap_or(false) {
-                ChargeStatus::Succeeded
+        let status = charge.status.as_deref().map(|status| self.map_charge_status(status)).unwrap_or_else(|| {
+            if charge.paid.unwrap_or(false) {
+                if charge.captured.unwrap_or(false) {
+                    ChargeStatus::Succeeded
+                } else {
+                    ChargeStatus::Processing
+                }
+            } else if charge.paid == Some(false) {
+                ChargeStatus::Failed
             } else {
-                ChargeStatus::Processing
+                ChargeStatus::Pending
             }
-        } else if charge.paid == Some(false) {
-            ChargeStatus::Failed
-        } else {
-            ChargeStatus::Pending
-        };
+        });
 
         UnifiedCharge {
             id: charge.id.clone(),
             amount: Money {
-                amount: charge.amount.as_ref().and_then(|a| a.parse().ok()).unwrap_or(0),
+                amount: charge.stripe_amount.or_else(|| {
+                    charge
+                    .amount
+                    .as_ref()
+                    .and_then(|a| a.parse().ok())
+                }).unwrap_or(0),
                 currency: charge.currency.clone().unwrap_or_else(|| "usd".to_string()),
             },
             customer_id: charge.customer.clone(),
@@ -170,13 +173,13 @@ impl StripeProvider {
             _ => RefundStatus::Pending,
         };
 
-        let reason = refund.reason.as_ref().map(|r| {
-            match r {
-                crate::stripe_ext::refund::RefundReason::Duplicate => RefundReason::Duplicate,
-                crate::stripe_ext::refund::RefundReason::Fraudulent => RefundReason::Fraudulent,
-                crate::stripe_ext::refund::RefundReason::RequestedByCustomer => RefundReason::RequestedByCustomer,
-                _ => RefundReason::Other("other".to_string()),
+        let reason = refund.reason.as_ref().map(|r| match r {
+            crate::stripe_ext::refund::RefundReason::Duplicate => RefundReason::Duplicate,
+            crate::stripe_ext::refund::RefundReason::Fraudulent => RefundReason::Fraudulent,
+            crate::stripe_ext::refund::RefundReason::RequestedByCustomer => {
+                RefundReason::RequestedByCustomer
             }
+            _ => RefundReason::Other("other".to_string()),
         });
 
         UnifiedRefund {
@@ -205,15 +208,23 @@ impl StripeProvider {
         }
     }
 
-    fn map_subscription_to_unified(&self, sub: &crate::stripe::response::Subscription) -> UnifiedSubscription {
-        let status = sub.status.as_ref()
+    fn map_subscription_to_unified(
+        &self,
+        sub: &crate::stripe::response::Subscription,
+    ) -> UnifiedSubscription {
+        let status = sub
+            .status
+            .as_ref()
             .map(|s| self.map_subscription_status(s))
             .unwrap_or(SubscriptionStatus::Incomplete);
 
-        // Extract price_id from items if available
-        let price_id = sub.items.as_ref()
+        // Stripe's subscription item ID (`si_...`) is distinct from its nested price ID.
+        let price_id = sub
+            .items
+            .as_ref()
             .and_then(|items| items.data.first())
-            .map(|item| item.id.clone());
+            .and_then(|item| item.price.as_ref())
+            .map(|price| price.id.clone());
 
         UnifiedSubscription {
             id: sub.id.clone(),
@@ -227,22 +238,6 @@ impl StripeProvider {
         }
     }
 
-    async fn stripe_error_to_payup(&self, error: reqwest::Error) -> PayupError {
-        if error.is_timeout() {
-            return PayupError::TimeoutError("Stripe API request timed out".to_string());
-        }
-        
-        if let Some(status) = error.status() {
-            if status.as_u16() == 429 {
-                return PayupError::RateLimitError { retry_after: None };
-            }
-            if status.is_server_error() {
-                return PayupError::ServerError(status.as_u16());
-            }
-        }
-
-        PayupError::NetworkError(error)
-    }
 }
 
 #[async_trait]
@@ -253,11 +248,13 @@ impl PaymentProvider for StripeProvider {
 
     fn supported_currencies(&self) -> Vec<String> {
         vec![
-            "usd", "eur", "gbp", "jpy", "cad", "aud", "chf", "cny", "hkd", "nzd",
-            "sek", "krw", "sgd", "nok", "mxn", "inr", "rub", "zar", "try", "brl",
-            "twd", "dkk", "pln", "thb", "idr", "huf", "czk", "ils", "clp", "php",
-            "aed", "cop", "sar", "myr", "ron"
-        ].into_iter().map(String::from).collect()
+            "usd", "eur", "gbp", "jpy", "cad", "aud", "chf", "cny", "hkd", "nzd", "sek", "krw",
+            "sgd", "nok", "mxn", "inr", "rub", "zar", "try", "brl", "twd", "dkk", "pln", "thb",
+            "idr", "huf", "czk", "ils", "clp", "php", "aed", "cop", "sar", "myr", "ron",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect()
     }
 
     fn supported_features(&self) -> Vec<PaymentFeature> {
@@ -288,7 +285,7 @@ impl PaymentProvider for StripeProvider {
 
     async fn update_customer(&self, customer: &UnifiedCustomer) -> Result<UnifiedCustomer> {
         let stripe_customer = self.map_unified_to_customer(customer);
-        let updated = stripe_customer.async_post(self.auth.clone()).await?;
+        let updated = stripe_customer.async_update(self.auth.clone()).await?;
         Ok(self.map_customer_to_unified(&updated))
     }
 
@@ -297,7 +294,11 @@ impl PaymentProvider for StripeProvider {
         Ok(true)
     }
 
-    async fn list_customers(&self, limit: Option<u32>, _offset: Option<u32>) -> Result<Vec<UnifiedCustomer>> {
+    async fn list_customers(
+        &self,
+        limit: Option<u32>,
+        _offset: Option<u32>,
+    ) -> Result<Vec<UnifiedCustomer>> {
         let customers = Customer::async_list(self.auth.clone()).await?;
         let limited = if let Some(l) = limit {
             customers.into_iter().take(l as usize).collect()
@@ -310,7 +311,10 @@ impl PaymentProvider for StripeProvider {
             .collect())
     }
 
-    async fn create_payment_method(&self, payment_method: &UnifiedPaymentMethod) -> Result<UnifiedPaymentMethod> {
+    async fn create_payment_method(
+        &self,
+        payment_method: &UnifiedPaymentMethod,
+    ) -> Result<UnifiedPaymentMethod> {
         // Map unified payment method to Stripe payment method type
         let payment_method_type = match &payment_method.method_type {
             PaymentMethodType::Card => StripePaymentMethodType::Card,
@@ -318,9 +322,12 @@ impl PaymentProvider for StripeProvider {
             PaymentMethodType::PayPal => StripePaymentMethodType::Paypal,
             PaymentMethodType::ApplePay => StripePaymentMethodType::Card, // Apple Pay uses card
             PaymentMethodType::GooglePay => StripePaymentMethodType::Card, // Google Pay uses card
-            _ => return Err(PayupError::UnsupportedOperation(
-                format!("Payment method type {:?} not supported by Stripe", payment_method.method_type)
-            )),
+            _ => {
+                return Err(PayupError::UnsupportedOperation(format!(
+                    "Payment method type {:?} not supported by Stripe",
+                    payment_method.method_type
+                )))
+            }
         };
 
         // Build parameters based on payment method type
@@ -357,8 +364,13 @@ impl PaymentProvider for StripeProvider {
         Ok(self.map_payment_method_to_unified(&payment_method))
     }
 
-    async fn attach_payment_method(&self, payment_method_id: &str, customer_id: &str) -> Result<UnifiedPaymentMethod> {
-        let attached = PaymentMethod::attach_async(&self.auth, payment_method_id, customer_id).await?;
+    async fn attach_payment_method(
+        &self,
+        payment_method_id: &str,
+        customer_id: &str,
+    ) -> Result<UnifiedPaymentMethod> {
+        let attached =
+            PaymentMethod::attach_async(&self.auth, payment_method_id, customer_id).await?;
         Ok(self.map_payment_method_to_unified(&attached))
     }
 
@@ -375,7 +387,7 @@ impl PaymentProvider for StripeProvider {
             customer: charge.customer_id.clone(),
             payment_method: charge.payment_method_id.clone(),
             description: charge.description.clone(),
-            metadata: None,
+            metadata: charge.metadata.clone(),
             ..Default::default()
         };
 
@@ -395,7 +407,11 @@ impl PaymentProvider for StripeProvider {
         }
     }
 
-    async fn capture_charge(&self, charge_id: &str, amount: Option<Money>) -> Result<UnifiedCharge> {
+    async fn capture_charge(
+        &self,
+        charge_id: &str,
+        amount: Option<Money>,
+    ) -> Result<UnifiedCharge> {
         if charge_id.starts_with("pi_") {
             let params = CapturePaymentIntentParams {
                 amount_to_capture: amount.map(|m| m.amount),
@@ -417,7 +433,11 @@ impl PaymentProvider for StripeProvider {
         }
     }
 
-    async fn list_charges(&self, _customer_id: Option<&str>, _limit: Option<u32>) -> Result<Vec<UnifiedCharge>> {
+    async fn list_charges(
+        &self,
+        _customer_id: Option<&str>,
+        _limit: Option<u32>,
+    ) -> Result<Vec<UnifiedCharge>> {
         // The async_list method doesn't support filtering by customer_id or limit
         // This would need to be implemented with proper query parameters
         let charges = Charge::async_list(self.auth.clone()).await?;
@@ -434,11 +454,13 @@ impl PaymentProvider for StripeProvider {
         stripe_refund.reason = refund.reason.as_ref().map(|r| match r {
             RefundReason::Duplicate => crate::stripe_ext::refund::RefundReason::Duplicate,
             RefundReason::Fraudulent => crate::stripe_ext::refund::RefundReason::Fraudulent,
-            RefundReason::RequestedByCustomer => crate::stripe_ext::refund::RefundReason::RequestedByCustomer,
+            RefundReason::RequestedByCustomer => {
+                crate::stripe_ext::refund::RefundReason::RequestedByCustomer
+            }
             RefundReason::Other(_) => crate::stripe_ext::refund::RefundReason::RequestedByCustomer,
         });
         stripe_refund.metadata = refund.metadata.clone();
-        
+
         let created = stripe_refund.async_post(self.auth.clone()).await?;
         Ok(self.map_refund_to_unified(&created))
     }
@@ -448,22 +470,31 @@ impl PaymentProvider for StripeProvider {
         Ok(self.map_refund_to_unified(&refund))
     }
 
-    async fn list_refunds(&self, charge_id: Option<&str>, limit: Option<u32>) -> Result<Vec<UnifiedRefund>> {
+    async fn list_refunds(
+        &self,
+        charge_id: Option<&str>,
+        limit: Option<u32>,
+    ) -> Result<Vec<UnifiedRefund>> {
         let refunds = StripeRefund::async_list(
             self.auth.clone(),
             charge_id.map(String::from),
-            limit.map(|l| l as i32)
-        ).await?;
-        Ok(refunds.data
+            limit.map(|l| l as i32),
+        )
+        .await?;
+        Ok(refunds
+            .data
             .iter()
             .map(|r| self.map_refund_to_unified(r))
             .collect())
     }
 
-    async fn create_subscription(&self, subscription: &UnifiedSubscription) -> Result<UnifiedSubscription> {
+    async fn create_subscription(
+        &self,
+        subscription: &UnifiedSubscription,
+    ) -> Result<UnifiedSubscription> {
         let mut stripe_sub = Subscription::new();
         stripe_sub.customer = Some(subscription.customer_id.clone());
-        
+
         // Set price ID if provided
         if let Some(price_id) = &subscription.price_id {
             stripe_sub.price_items = Some(vec![price_id.clone()]);
@@ -472,95 +503,114 @@ impl PaymentProvider for StripeProvider {
             stripe_sub.price_items = Some(vec![plan_id.clone()]);
         } else {
             return Err(PayupError::ValidationError(
-                "Either price_id or plan_id must be provided for subscription".to_string()
+                "Either price_id or plan_id must be provided for subscription".to_string(),
             ));
         }
-        
+
         // Set cancel_at_period_end if needed
         stripe_sub.cancel_at_period_end = Some(subscription.cancel_at_period_end);
-        
-        let stripe_response = stripe_sub.async_post(self.auth.clone()).await
-            .map_err(|e| PayupError::ApiError {
-                code: "subscription_create_error".to_string(),
-                message: format!("Failed to create subscription: {}", e),
-                provider: "stripe".to_string(),
-            })?;
-        
+
+        let stripe_response = stripe_sub.async_post(self.auth.clone()).await?;
+
         Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
     async fn get_subscription(&self, subscription_id: &str) -> Result<UnifiedSubscription> {
-        let stripe_response = Subscription::async_get(
-            self.auth.clone(),
-            subscription_id.to_string()
-        ).await
-            .map_err(|e| PayupError::ApiError {
-                code: "subscription_get_error".to_string(),
-                message: format!("Failed to get subscription: {}", e),
-                provider: "stripe".to_string(),
-            })?;
-        
+        let stripe_response =
+            Subscription::async_get(self.auth.clone(), subscription_id.to_string()).await?;
+
         Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
-    async fn update_subscription(&self, subscription: &UnifiedSubscription) -> Result<UnifiedSubscription> {
+    async fn update_subscription(
+        &self,
+        subscription: &UnifiedSubscription,
+    ) -> Result<UnifiedSubscription> {
         if subscription.id.is_none() {
             return Err(PayupError::ValidationError(
-                "Subscription ID is required for update".to_string()
+                "Subscription ID is required for update".to_string(),
             ));
         }
-        
+
         let mut stripe_sub = Subscription::new();
         stripe_sub.id = subscription.id.clone();
-        
+
         // Update price if provided
         if let Some(price_id) = &subscription.price_id {
+            let existing = Subscription::async_get(
+                self.auth.clone(),
+                subscription.id.clone().unwrap_or_default(),
+            )
+            .await?;
+            let subscription_item_id = existing
+                .items
+                .as_ref()
+                .and_then(|items| items.data.first())
+                .map(|item| item.id.clone())
+                .ok_or_else(|| {
+                    PayupError::ValidationError(
+                        "Stripe subscription has no item to replace".to_string(),
+                    )
+                })?;
             stripe_sub.price_items = Some(vec![price_id.clone()]);
+            stripe_sub.subscription_item_ids = Some(vec![subscription_item_id]);
         } else if let Some(plan_id) = &subscription.plan_id {
+            let existing = Subscription::async_get(
+                self.auth.clone(),
+                subscription.id.clone().unwrap_or_default(),
+            )
+            .await?;
+            let subscription_item_id = existing
+                .items
+                .as_ref()
+                .and_then(|items| items.data.first())
+                .map(|item| item.id.clone())
+                .ok_or_else(|| {
+                    PayupError::ValidationError(
+                        "Stripe subscription has no item to replace".to_string(),
+                    )
+                })?;
             stripe_sub.price_items = Some(vec![plan_id.clone()]);
+            stripe_sub.subscription_item_ids = Some(vec![subscription_item_id]);
         }
-        
+
         // Update cancel_at_period_end
         stripe_sub.cancel_at_period_end = Some(subscription.cancel_at_period_end);
-        
-        let stripe_response = stripe_sub.async_update(self.auth.clone()).await
-            .map_err(|e| PayupError::ApiError {
-                code: "subscription_update_error".to_string(),
-                message: format!("Failed to update subscription: {}", e),
-                provider: "stripe".to_string(),
-            })?;
-        
+
+        let stripe_response = stripe_sub.async_update(self.auth.clone()).await?;
+
         Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
-    async fn cancel_subscription(&self, subscription_id: &str, at_period_end: bool) -> Result<UnifiedSubscription> {
+    async fn cancel_subscription(
+        &self,
+        subscription_id: &str,
+        at_period_end: bool,
+    ) -> Result<UnifiedSubscription> {
         let stripe_response = Subscription::async_cancel(
             self.auth.clone(),
             subscription_id.to_string(),
-            at_period_end
-        ).await
-            .map_err(|e| PayupError::ApiError {
-                code: "subscription_cancel_error".to_string(),
-                message: format!("Failed to cancel subscription: {}", e),
-                provider: "stripe".to_string(),
-            })?;
-        
+            at_period_end,
+        )
+        .await?;
+
         Ok(self.map_subscription_to_unified(&stripe_response))
     }
 
-    async fn list_subscriptions(&self, customer_id: Option<&str>, limit: Option<u32>) -> Result<Vec<UnifiedSubscription>> {
+    async fn list_subscriptions(
+        &self,
+        customer_id: Option<&str>,
+        limit: Option<u32>,
+    ) -> Result<Vec<UnifiedSubscription>> {
         let stripe_response = Subscription::async_list(
             self.auth.clone(),
             customer_id.map(String::from),
-            limit.map(|l| l as i32)
-        ).await
-            .map_err(|e| PayupError::ApiError {
-                code: "subscription_list_error".to_string(),
-                message: format!("Failed to list subscriptions: {}", e),
-                provider: "stripe".to_string(),
-            })?;
-        
-        Ok(stripe_response.data
+            limit.map(|l| l as i32),
+        )
+        .await?;
+
+        Ok(stripe_response
+            .data
             .iter()
             .map(|s| self.map_subscription_to_unified(s))
             .collect())
@@ -568,13 +618,50 @@ impl PaymentProvider for StripeProvider {
 
     async fn verify_webhook(&self, payload: &[u8], signature: &str, secret: &str) -> Result<bool> {
         use super::webhooks::StripeWebhookHandler;
-        
+
         let handler = StripeWebhookHandler::new(secret.to_string());
-        match handler.verify_signature(std::str::from_utf8(payload).map_err(|e| 
-            PayupError::ValidationError(format!("Invalid UTF-8 in webhook payload: {}", e))
-        )?, signature) {
+        match handler.verify_signature(
+            std::str::from_utf8(payload).map_err(|e| {
+                PayupError::ValidationError(format!("Invalid UTF-8 in webhook payload: {}", e))
+            })?,
+            signature,
+        ) {
             Ok(_) => Ok(true),
             Err(_) => Ok(false),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stripe::response::{
+        Subscription as StripeSubscription, SubscriptionItem, SubscriptionItemPrice,
+        SubscriptionItems,
+    };
+
+    #[test]
+    fn subscription_mapping_uses_nested_price_not_item_id() {
+        let provider = StripeProvider::new("sk_test_placeholder".to_string());
+        let stripe_subscription = StripeSubscription {
+            id: Some("sub_123".to_string()),
+            customer: Some("cus_123".to_string()),
+            status: Some("active".to_string()),
+            items: Some(SubscriptionItems {
+                data: vec![SubscriptionItem {
+                    id: "si_123".to_string(),
+                    price: Some(SubscriptionItemPrice {
+                        id: "price_123".to_string(),
+                        object: "price".to_string(),
+                    }),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let unified = provider.map_subscription_to_unified(&stripe_subscription);
+        assert_eq!(unified.price_id.as_deref(), Some("price_123"));
     }
 }

@@ -263,11 +263,18 @@ pub struct SubscriptionItem {
     pub created: i64,
     // pub metadata: Metadata,
     // pub plan: Plan,
-    // pub price: Price,
+    pub price: Option<SubscriptionItemPrice>,
     pub quantity: i64,
     pub subscription: String,
     // #[serde(rename = "tax_rates")]
     // pub tax_rates: Vec<Value>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SubscriptionItemPrice {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
 }
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

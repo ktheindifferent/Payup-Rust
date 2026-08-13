@@ -1,7 +1,11 @@
-use serde::{Deserialize, Serialize};
-use crate::error::Result;
-use crate::http_client::{get_shared_client, get_shared_blocking_client};
 use super::Auth;
+use crate::error::Result;
+use crate::http_client::{get_shared_blocking_client, get_shared_client};
+use crate::stripe::request::{
+    idempotent_blocking_request, idempotent_request, parse_async_response, parse_blocking_response,
+    IdempotencyKey,
+};
+use serde::{Deserialize, Serialize};
 
 /// Represents a Stripe Account (Connect account)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -335,11 +339,11 @@ pub struct TosAcceptanceParams {
 
 impl Account {
     /// Create a new Connect account
-    /// 
+    ///
     /// # Example
     /// ```ignore
     /// use payup::stripe::{Auth, Account, CreateAccountParams};
-    /// 
+    ///
     /// let auth = Auth::new("test_key".to_string(), "test_secret".to_string());
     /// let params = CreateAccountParams {
     ///     type: Some("express".to_string()),
@@ -351,105 +355,120 @@ impl Account {
     /// ```
     pub fn create(auth: &Auth, params: CreateAccountParams) -> Result<Self> {
         let client = get_shared_blocking_client();
-        let response = client
+        let request = client
             .post("https://api.stripe.com/v1/accounts")
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate())
             .form(&params)
             .send()?;
-        
-        let account: Account = response.json()?;
-        Ok(account)
+        parse_blocking_response(response)
     }
 
     /// Create a new Connect account (async)
     pub async fn create_async(auth: &Auth, params: CreateAccountParams) -> Result<Self> {
         let client = get_shared_client();
-        let response = client
+        let request = client
             .post("https://api.stripe.com/v1/accounts")
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .form(&params)
             .send()
             .await?;
-        
-        let account: Account = response.json().await?;
-        Ok(account)
+        parse_async_response(response).await
     }
 
     /// Retrieve an account by ID
     pub fn retrieve(auth: &Auth, account_id: &str) -> Result<Self> {
         let client = get_shared_blocking_client();
         let response = client
-            .get(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .get(&format!(
+                "https://api.stripe.com/v1/accounts/{}",
+                account_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()?;
-        
-        let account: Account = response.json()?;
-        Ok(account)
+
+        parse_blocking_response(response)
     }
 
     /// Retrieve an account by ID (async)
     pub async fn retrieve_async(auth: &Auth, account_id: &str) -> Result<Self> {
         let client = get_shared_client();
         let response = client
-            .get(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .get(&format!(
+                "https://api.stripe.com/v1/accounts/{}",
+                account_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()
             .await?;
-        
-        let account: Account = response.json().await?;
-        Ok(account)
+
+        parse_async_response(response).await
     }
 
     /// Update an account
     pub fn update(auth: &Auth, account_id: &str, params: serde_json::Value) -> Result<Self> {
         let client = get_shared_blocking_client();
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+        let request = client
+            .post(&format!(
+                "https://api.stripe.com/v1/accounts/{}",
+                account_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate())
             .json(&params)
             .send()?;
-        
-        let account: Account = response.json()?;
-        Ok(account)
+        parse_blocking_response(response)
     }
 
     /// Update an account (async)
-    pub async fn update_async(auth: &Auth, account_id: &str, params: serde_json::Value) -> Result<Self> {
+    pub async fn update_async(
+        auth: &Auth,
+        account_id: &str,
+        params: serde_json::Value,
+    ) -> Result<Self> {
         let client = get_shared_client();
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+        let request = client
+            .post(&format!(
+                "https://api.stripe.com/v1/accounts/{}",
+                account_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .json(&params)
             .send()
             .await?;
-        
-        let account: Account = response.json().await?;
-        Ok(account)
+        parse_async_response(response).await
     }
 
     /// Delete an account
     pub fn delete(auth: &Auth, account_id: &str) -> Result<DeletedAccount> {
         let client = get_shared_blocking_client();
-        let response = client
-            .delete(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
-            .send()?;
-        
-        let deleted: DeletedAccount = response.json()?;
-        Ok(deleted)
+        let request = client
+            .delete(&format!(
+                "https://api.stripe.com/v1/accounts/{}",
+                account_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate()).send()?;
+
+        parse_blocking_response(response)
     }
 
     /// Delete an account (async)
     pub async fn delete_async(auth: &Auth, account_id: &str) -> Result<DeletedAccount> {
         let client = get_shared_client();
-        let response = client
-            .delete(&format!("https://api.stripe.com/v1/accounts/{}", account_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+        let request = client
+            .delete(&format!(
+                "https://api.stripe.com/v1/accounts/{}",
+                account_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .send()
             .await?;
-        
-        let deleted: DeletedAccount = response.json().await?;
-        Ok(deleted)
+
+        parse_async_response(response).await
     }
 
     /// List all accounts
@@ -459,18 +478,18 @@ impl Account {
         if let Some(limit) = limit {
             url = format!("{}?limit={}", url, limit);
         }
-        
+
         let response = client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()?;
-        
+
         #[derive(Deserialize)]
         struct AccountList {
             data: Vec<Account>,
         }
-        
-        let list: AccountList = response.json()?;
+
+        let list: AccountList = parse_blocking_response(response)?;
         Ok(list.data)
     }
 
@@ -481,19 +500,19 @@ impl Account {
         if let Some(limit) = limit {
             url = format!("{}?limit={}", url, limit);
         }
-        
+
         let response = client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", auth.secret))
+            .header("Authorization", format!("Bearer {}", auth.api_key()))
             .send()
             .await?;
-        
+
         #[derive(Deserialize)]
         struct AccountList {
             data: Vec<Account>,
         }
-        
-        let list: AccountList = response.json().await?;
+
+        let list: AccountList = parse_async_response(response).await?;
         Ok(list.data)
     }
 
@@ -503,15 +522,17 @@ impl Account {
         let params = serde_json::json!({
             "reason": reason
         });
-        
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/accounts/{}/reject", account_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+
+        let request = client
+            .post(&format!(
+                "https://api.stripe.com/v1/accounts/{}/reject",
+                account_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate())
             .json(&params)
             .send()?;
-        
-        let account: Account = response.json()?;
-        Ok(account)
+        parse_blocking_response(response)
     }
 
     /// Reject an account (async)
@@ -520,16 +541,18 @@ impl Account {
         let params = serde_json::json!({
             "reason": reason
         });
-        
-        let response = client
-            .post(&format!("https://api.stripe.com/v1/accounts/{}/reject", account_id))
-            .header("Authorization", format!("Bearer {}", auth.secret))
+
+        let request = client
+            .post(&format!(
+                "https://api.stripe.com/v1/accounts/{}/reject",
+                account_id
+            ))
+            .header("Authorization", format!("Bearer {}", auth.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .json(&params)
             .send()
             .await?;
-        
-        let account: Account = response.json().await?;
-        Ok(account)
+        parse_async_response(response).await
     }
 }
 

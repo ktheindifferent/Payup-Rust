@@ -1,6 +1,11 @@
-use serde::{Deserialize, Serialize};
+use crate::error::{PayupError, Result};
+use crate::http_client::{get_shared_blocking_client, get_shared_client};
+use crate::stripe::request::{
+    idempotent_blocking_request, idempotent_request, parse_async_response,
+    parse_blocking_response, IdempotencyKey,
+};
 use crate::stripe::Auth;
-use crate::http_client::{get_shared_client, get_shared_blocking_client};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Product {
@@ -55,60 +60,61 @@ impl Product {
     }
 
     /// Create a new product
-    /// 
+    ///
     /// # Example
     /// ```ignore
     /// use payup::stripe_ext::product::Product;
     /// use payup::stripe::Auth;
-    /// 
+    ///
     /// let auth = Auth::new("test_key".to_string(), "test_secret".to_string());
     /// let mut product = Product::new();
     /// product.name = "Premium Widget".to_string();
     /// product.description = Some("A high-quality widget".to_string());
     /// let created_product = product.post(auth)?;
     /// ```
-    pub fn post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+    pub fn post(&self, creds: Auth) -> Result<Self> {
         let client = get_shared_blocking_client();
         let mut params = std::collections::HashMap::new();
-        
+
         params.insert("name", self.name.clone());
-        
+
         if let Some(desc) = &self.description {
             params.insert("description", desc.clone());
         }
-        
+
         if let Some(active) = &self.active {
             params.insert("active", active.to_string());
         }
-        
+
         if let Some(url) = &self.url {
             params.insert("url", url.clone());
         }
 
-        let response = client
+        let request = client
             .post("https://api.stripe.com/v1/products")
-            .header("Authorization", format!("Bearer {}", creds.client))
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate())
             .form(&params)
             .send()?;
 
-        response.json()
+        parse_blocking_response(response)
     }
 
     /// Retrieve a product
-    pub fn get(creds: Auth, product_id: String) -> Result<Self, reqwest::Error> {
+    pub fn get(creds: Auth, product_id: String) -> Result<Self> {
         let client = get_shared_blocking_client();
         let url = format!("https://api.stripe.com/v1/products/{}", product_id);
 
         let response = client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", creds.client))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()?;
 
-        response.json()
+        parse_blocking_response(response)
     }
 
     /// Update a product
-    pub fn update(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+    pub fn update(&self, creds: Auth) -> Result<Self> {
         if let Some(id) = &self.id {
             let client = get_shared_blocking_client();
             let url = format!("https://api.stripe.com/v1/products/{}", id);
@@ -117,113 +123,117 @@ impl Product {
             if let Some(desc) = &self.description {
                 params.insert("description", desc.clone());
             }
-            
+
             if let Some(active) = &self.active {
                 params.insert("active", active.to_string());
             }
-            
+
             params.insert("name", self.name.clone());
 
-            let response = client
+            let request = client
                 .post(&url)
-                .header("Authorization", format!("Bearer {}", creds.client))
+                .header("Authorization", format!("Bearer {}", creds.api_key()));
+            let response = idempotent_blocking_request(request, &IdempotencyKey::generate())
                 .form(&params)
                 .send()?;
 
-            response.json()
+            parse_blocking_response(response)
         } else {
-            // Return a mock error - in production, use proper error handling
-            let client = get_shared_blocking_client();
-            let response = client.get("https://invalid.url").send()?;
-            response.json()
+            Err(PayupError::ValidationError(
+                "Product ID is required for update".to_string(),
+            ))
         }
     }
 
     /// List all products
-    pub fn list(creds: Auth, limit: Option<i32>) -> Result<ProductList, reqwest::Error> {
+    pub fn list(creds: Auth, limit: Option<i32>) -> Result<ProductList> {
         let client = get_shared_blocking_client();
         let mut url = String::from("https://api.stripe.com/v1/products");
-        
+
         if let Some(lim) = limit {
             url.push_str(&format!("?limit={}", lim));
         }
 
         let response = client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", creds.client))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()?;
 
-        response.json()
+        parse_blocking_response(response)
     }
 
     /// Delete a product
-    pub fn delete(creds: Auth, product_id: String) -> Result<DeletedProduct, reqwest::Error> {
+    pub fn delete(creds: Auth, product_id: String) -> Result<DeletedProduct> {
         let client = get_shared_blocking_client();
         let url = format!("https://api.stripe.com/v1/products/{}", product_id);
 
-        let response = client
+        let request = client
             .delete(&url)
-            .header("Authorization", format!("Bearer {}", creds.client))
-            .send()?;
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let response = idempotent_blocking_request(request, &IdempotencyKey::generate()).send()?;
 
-        response.json()
+        parse_blocking_response(response)
     }
 
     /// Async create a new product
-    pub async fn async_post(&self, creds: Auth) -> Result<Self, reqwest::Error> {
+    pub async fn async_post(&self, creds: Auth) -> Result<Self> {
         let client = get_shared_client();
         let mut params = std::collections::HashMap::new();
-        
+
         params.insert("name", self.name.clone());
-        
+
         if let Some(desc) = &self.description {
             params.insert("description", desc.clone());
         }
-        
+
         if let Some(active) = &self.active {
             params.insert("active", active.to_string());
         }
 
-        let response = client
+        let request = client
             .post("https://api.stripe.com/v1/products")
-            .header("Authorization", format!("Bearer {}", creds.client))
+            .header("Authorization", format!("Bearer {}", creds.api_key()));
+        let response = idempotent_request(request, &IdempotencyKey::generate())
             .form(&params)
             .send()
             .await?;
 
-        response.json().await
+        parse_async_response(response).await
     }
 
     /// Async retrieve a product
-    pub async fn async_get(creds: Auth, product_id: String) -> Result<Self, reqwest::Error> {
+    pub async fn async_get(creds: Auth, product_id: String) -> Result<Self> {
         let client = get_shared_client();
         let url = format!("https://api.stripe.com/v1/products/{}", product_id);
 
         let response = client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", creds.client))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()
             .await?;
 
-        response.json().await
+        parse_async_response(response).await
     }
 
     /// Async list all products
-    pub async fn async_list(creds: Auth, limit: Option<i32>) -> Result<ProductList, reqwest::Error> {
+    pub async fn async_list(
+        creds: Auth,
+        limit: Option<i32>,
+    ) -> Result<ProductList> {
         let client = get_shared_client();
         let mut url = String::from("https://api.stripe.com/v1/products");
-        
+
         if let Some(lim) = limit {
             url.push_str(&format!("?limit={}", lim));
         }
 
         let response = client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", creds.client))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()
             .await?;
 
-        response.json().await
+        parse_async_response(response).await
     }
 }
 

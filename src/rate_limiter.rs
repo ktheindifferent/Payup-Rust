@@ -301,6 +301,7 @@ fn is_retryable_error(error: &PayupError) -> bool {
         PayupError::NetworkError(_) => true,
         PayupError::RateLimitExceeded(_) => true,
         PayupError::ServerError(status) if *status >= 500 => true,
+        PayupError::StripeApiError { status, .. } if *status == 429 || *status >= 500 => true,
         PayupError::TimeoutError(_) => true,
         _ => false,
     }
@@ -311,6 +312,7 @@ fn is_circuit_breaking_error(error: &PayupError) -> bool {
     match error {
         PayupError::NetworkError(_) => true,
         PayupError::ServerError(status) if *status >= 500 => true,
+        PayupError::StripeApiError { status, .. } if *status >= 500 => true,
         PayupError::TimeoutError(_) => true,
         _ => false,
     }

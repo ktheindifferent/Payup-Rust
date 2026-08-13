@@ -50,7 +50,7 @@ fn main() {
     
     // Example signature header (this would come from the Stripe-Signature header)
     // In a real scenario, you'd get this from the HTTP request headers
-    let signature_header = "t=1614556800 v1=5257a869e7ecb3f2e3c5a6d5e3b5a6d5e3b5a6d5e3b5a6d5e3b5a6d5e3b5a6d5";
+    let signature_header = "t=1614556800,v1=5257a869e7ecb3f2e3c5a6d5e3b5a6d5e3b5a6d5e3b5a6d5e3b5a6d5e3b5a6d5";
     
     // Verify and construct the event
     match webhook_handler.construct_event(payload, signature_header) {

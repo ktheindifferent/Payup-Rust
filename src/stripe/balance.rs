@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::stripe::auth::Auth;
+use crate::error::Result;
 use crate::http_client::{get_shared_client, get_shared_blocking_client};
+use crate::stripe::request::{parse_async_response, parse_blocking_response};
 
 /// Represents your Stripe balance.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -29,15 +31,14 @@ impl Balance {
     /// // Fetch balance
     /// let balance = payup::stripe::Balance::async_get(auth).await;
     /// ```ignore
-    pub async fn async_get(creds: Auth) -> Result<Self, reqwest::Error> {
+    pub async fn async_get(creds: Auth) -> Result<Self> {
         let url = "https://api.stripe.com/v1/balance";
         let request = get_shared_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()
             .await?;
-        let json = request.json::<Self>().await?;
-        Ok(json)
+        parse_async_response(request).await
     }
 
     /// Retrieves the current account balance based on the authentication that was used to make the request.
@@ -55,14 +56,13 @@ impl Balance {
     /// // Fetch balance
     /// let balance = payup::stripe::Balance::get(auth);
     /// ```ignore
-    pub fn get(creds: Auth) -> Result<Self, reqwest::Error> {
+    pub fn get(creds: Auth) -> Result<Self> {
         let url = "https://api.stripe.com/v1/balance";
         let request = get_shared_blocking_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()?;
-        let json = request.json::<Self>()?;
-        Ok(json)
+        parse_blocking_response(request)
     }
 }
 
@@ -109,15 +109,14 @@ impl BalanceTransaction {
     /// // Retrieve the balance transaction with the given ID.
     /// let balance_transaction = payup::stripe::BalanceTransaction::async_get(auth, "txn_test123".to_string()).await;
     /// ```ignore
-    pub async fn async_get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
+    pub async fn async_get(creds: Auth, id: String) -> Result<Self> {
         let url = format!("https://api.stripe.com/v1/balance_transactions/{}", id);
         let request = get_shared_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()
             .await?;
-        let json = request.json::<Self>().await?;
-        Ok(json)
+        parse_async_response(request).await
     }
 
     /// Asynchronously lists all balance transactions
@@ -135,7 +134,7 @@ impl BalanceTransaction {
     /// // List all balance transactions.
     /// let balance_transactions = payup::stripe::BalanceTransaction::async_list(auth).await;
     /// ```ignore
-    pub async fn async_list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
+    pub async fn async_list(creds: Auth) -> Result<Vec<Self>> {
         let mut objects = Vec::new();
         let mut has_more = true;
         let mut starting_after = None;
@@ -167,14 +166,13 @@ impl BalanceTransaction {
     /// // Retrieve the balance transaction with the given ID.
     /// let balance_transaction = payup::stripe::BalanceTransaction::get(auth, "txn_test123".to_string());
     /// ```ignore
-    pub fn get(creds: Auth, id: String) -> Result<Self, reqwest::Error> {
+    pub fn get(creds: Auth, id: String) -> Result<Self> {
         let url = format!("https://api.stripe.com/v1/balance_transactions/{}", id);
         let request = get_shared_blocking_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()?;
-        let json = request.json::<Self>()?;
-        Ok(json)
+        parse_blocking_response(request)
     }
 
     /// Lists all balance transactions
@@ -192,7 +190,7 @@ impl BalanceTransaction {
     /// // List all balance transactions.
     /// let balance_transactions = payup::stripe::BalanceTransaction::list(auth);
     /// ```ignore
-    pub fn list(creds: Auth) -> Result<Vec<Self>, reqwest::Error> {
+    pub fn list(creds: Auth) -> Result<Vec<Self>> {
         let mut objects = Vec::new();
         let mut has_more = true;
         let mut starting_after = None;
@@ -211,7 +209,7 @@ impl BalanceTransaction {
     fn list_chunk(
         creds: Auth,
         starting_after: Option<String>,
-    ) -> Result<BalanceTransactions, reqwest::Error> {
+    ) -> Result<BalanceTransactions> {
         let url = match starting_after {
             Some(ref id) => format!(
                 "https://api.stripe.com/v1/balance_transactions?starting_after={}",
@@ -222,16 +220,15 @@ impl BalanceTransaction {
 
         let request = get_shared_blocking_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()?;
-        let json = request.json::<BalanceTransactions>()?;
-        Ok(json)
+        parse_blocking_response(request)
     }
 
     async fn list_chunk_async(
         creds: Auth,
         starting_after: Option<String>,
-    ) -> Result<BalanceTransactions, reqwest::Error> {
+    ) -> Result<BalanceTransactions> {
         let url = match starting_after {
             Some(ref id) => format!(
                 "https://api.stripe.com/v1/balance_transactions?starting_after={}",
@@ -242,11 +239,10 @@ impl BalanceTransaction {
 
         let request = get_shared_client()
             .get(url)
-            .basic_auth(creds.client.as_str(), Some(creds.secret.as_str()))
+            .header("Authorization", format!("Bearer {}", creds.api_key()))
             .send()
             .await?;
-        let json = request.json::<BalanceTransactions>().await?;
-        Ok(json)
+        parse_async_response(request).await
     }
 }
 

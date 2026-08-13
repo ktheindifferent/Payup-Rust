@@ -91,7 +91,7 @@ pub struct PaymentIntentBuilder {
 impl PaymentIntentBuilder {
     pub fn new(auth: &Auth) -> Self {
         let client = HttpClient::new(STRIPE_BASE_URL)
-            .with_bearer_auth(&auth.secret);
+            .with_bearer_auth(auth.api_key());
         Self { client }
     }
 
